@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ranking Geral - ENEM Simulator</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="main-content">
+            <header class="page-header">
+                <h1><i class="fas fa-trophy"></i> Ranking Geral</h1>
+                <div class="user-info">
+                    {% if user %}
+                    <span>Olá, <strong>{{ user.name }}</strong>!</span>
+                    <a href="/" class="btn btn-sm btn-secondary"><i class="fas fa-home"></i> Início</a>
+                    {% endif %}
+                </div>
+            </header>
+
+            <main>
+                <div class="card">
+                    <div class="card-body">
+                        <p class="text-center text-muted mb-4">Confira os melhores desempenhos da plataforma.</p>
+                        
+                        <div id="loadingSpinner" class="spinner-wrapper">
+                            <i class="fas fa-spinner fa-2x"></i>
+                            <p class="mt-3">Carregando ranking...</p>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table id="rankingTable" class="table table-hover" style="display: none;">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Usuário</th>
+                                        <th>Acertos (%)</th>
+                                        <th>Acertos (Qtd)</th>
+                                        <th>Tempo Médio</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div id="noDataMessage" class="text-center text-muted py-5" style="display: none;">
+                            <i class="fas fa-info-circle fa-3x mb-3"></i>
+                            <p>Nenhum simulado foi concluído ainda. <br>Seja o primeiro do ranking!</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            const rankingTable = document.getElementById('rankingTable');
+            const rankingTableBody = rankingTable.querySelector('tbody');
+            const noDataMessage = document.getElementById('noDataMessage');
+
+            fetch('/api/ranking_geral')
+                .then(response => response.ok ? response.json() : Promise.reject('Erro na rede'))
+                .then(data => {
+                    loadingSpinner.style.display = 'none';
+                    if (Array.isArray(data) && data.length > 0) {
+                        rankingTable.style.display = 'table';
+                        const headers = ["#", "Usuário", "Acertos (%)", "Acertos (Qtd)", "Tempo Médio"];
+                        data.forEach((item, index) => {
+                            const row = rankingTableBody.insertRow();
+                            row.innerHTML = `
+                                <td data-label="${headers[0]}">${index + 1}</td>
+                                <td data-label="${headers[1]}">${item.name}</td>
+                                <td data-label="${headers[2]}">${item.porcentagem}%</td>
+                                <td data-label="${headers[3]}">${item.acertos} / ${item.total_questoes}</td>
+                                <td data-label="${headers[4]}">${item.duracao_formatada}</td>
+                            `;
+                        });
+                    } else {
+                        noDataMessage.style.display = 'block';
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar ranking:', error);
+                    loadingSpinner.style.display = 'none';
+                    noDataMessage.innerHTML = `<i class="fas fa-exclamation-triangle fa-3x mb-3"></i><p>Erro ao carregar o ranking.</p>`;
+                    noDataMessage.style.display = 'block';
+                });
+        });
+    </script>
+</body>
+</html>

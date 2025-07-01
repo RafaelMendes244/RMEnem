@@ -1,0 +1,1 @@
+// Este script pode ser usado para lógica adicional se necessário

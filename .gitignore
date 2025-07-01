@@ -1,0 +1,7 @@
+# Ignorar arquivos de ambiente
+.env
+
+# Outras coisas comuns de se ignorar em projetos Python
+__pycache__/
+*.pyc
+venv/

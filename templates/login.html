@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - ENEM Simulator</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <div class="login-header">
+                <h2>Simulador Enem - RM</h2>
+            </div>
+            <div class="login-body">
+                {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                <div class="alert alert-danger">
+                    {% for message in messages %}
+                    <div>{{ message }}</div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                <div id="login-form-container">
+                    <form action="/login/email" method="POST">
+                        <div class="form-group">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" id="email" name="email" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="password" class="form-label">Senha</label>
+                            <div class="password-input">
+                                <input type="password" id="password" name="password" class="form-control" required>
+                                <button type="button" class="toggle-password" aria-label="Mostrar senha"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block btn-lg">Entrar</button>
+                    </form>
+                    <div class="divider">ou</div>
+                    <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block"><i class="fab fa-google"></i> Entrar com Google</a>
+                    <p class="text-center mt-4">Não tem uma conta? <a href="#" id="show-register">Cadastre-se</a></p>
+                </div>
+
+                <div id="register-form-container" style="display: none;">
+                    <form action="/register" method="POST">
+                        <div class="form-group">
+                            <label for="reg-name" class="form-label">Nome (opcional)</label>
+                            <input type="text" id="reg-name" name="name" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-email" class="form-label">Email</label>
+                            <input type="email" id="reg-email" name="email" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-password" class="form-label">Senha</label>
+                            <div class="password-input">
+                                <input type="password" id="reg-password" name="password" class="form-control" required>
+                                <button type="button" class="toggle-password" aria-label="Mostrar senha"><i class="fas fa-eye"></i></button>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success btn-block btn-lg">Cadastrar</button>
+                        <p class="text-center mt-4">Já tem uma conta? <a href="#" id="hide-register">Faça o login</a></p>
+                    </form>
+                </div>
+
+                <div class="text-center mt-4">
+                    <a href="/" class="text-muted"><i class="fas fa-arrow-left"></i> Voltar para página inicial</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.toggle-password').forEach(button => {
+                button.addEventListener('click', function() {
+                    const input = this.previousElementSibling;
+                    const icon = this.querySelector('i');
+                    if (input.type === 'password') {
+                        input.type = 'text';
+                        icon.classList.replace('fa-eye', 'fa-eye-slash');
+                    } else {
+                        input.type = 'password';
+                        icon.classList.replace('fa-eye-slash', 'fa-eye');
+                    }
+                });
+            });
+
+            const loginContainer = document.getElementById('login-form-container');
+            const registerContainer = document.getElementById('register-form-container');
+            const showRegisterLink = document.getElementById('show-register');
+            const hideRegisterLink = document.getElementById('hide-register');
+
+            showRegisterLink.addEventListener('click', e => { e.preventDefault(); loginContainer.style.display = 'none'; registerContainer.style.display = 'block'; });
+            hideRegisterLink.addEventListener('click', e => { e.preventDefault(); registerContainer.style.display = 'none'; loginContainer.style.display = 'block'; });
+        });
+    </script>
+</body>
+</html>

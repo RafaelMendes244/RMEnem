@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ENEM Simulator - Prepare-se para o Sucesso</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="main-header">
+        <div class="container">
+            <nav class="navbar">
+                <a href="/" class="navbar-brand">
+                    <span class="logo">ENEM Simulator</span>
+                </a>
+                <button class="navbar-toggler" type="button" aria-label="Toggle navigation">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="navbar-collapse">
+                    <ul class="navbar-nav">
+                        {% if user %}
+                        <li><a href="/exame" class="nav-link"><i class="fas fa-clipboard-list"></i> Simulados</a></li>
+                        <li><a href="/historico" class="nav-link"><i class="fas fa-history"></i> Meus Resultados</a></li>
+                        <li><a href="/ranking" class="nav-link"><i class="fas fa-trophy"></i> Ranking</a></li>
+                        <li><a href="/logout" class="nav-link"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
+                        {% else %}
+                        <li><a href="/ranking" class="nav-link"><i class="fas fa-trophy"></i> Ranking</a></li>
+                        <li><a href="/login" class="btn btn-primary btn-sm"><i class="fas fa-sign-in-alt"></i> Entrar</a></li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                {% with messages = get_flashed_messages() %}
+                    {% if messages %}
+                    <div class="alert alert-success alert-dismissible">
+                        {% for message in messages %}
+                        <div>{{ message }}</div>
+                        {% endfor %}
+                        <button type="button" class="close" aria-label="Close">&times;</button>
+                    </div>
+                    {% endif %}
+                {% endwith %}
+
+                <div class="hero-content">
+                    {% if user %}
+                    <h1 class="hero-title">Bem-vindo, {{ user.name }}!</h1>
+                    <p class="hero-subtitle">Pronto para testar seus conhecimentos e alcançar a nota dos seus sonhos?</p>
+                    <div class="hero-buttons">
+                        <a href="/exame" class="btn btn-light btn-lg"><i class="fas fa-play"></i> Iniciar Novo Simulado</a>
+                        <a href="/historico" class="btn btn-outline-light btn-lg"><i class="fas fa-chart-line"></i> Ver Meus Resultados</a>
+                    </div>
+                    {% else %}
+                    <h1 class="hero-title">Prepare-se para o ENEM de forma inteligente</h1>
+                    <p class="hero-subtitle">Simulados com questões reais, correção detalhada e ranking para você acompanhar sua evolução.</p>
+                    <div class="hero-buttons">
+                        <a href="/login" class="btn btn-light btn-lg"><i class="fas fa-rocket"></i> Começar Agora</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section class="section features-section">
+            <div class="container">
+                <h2 class="section-title">Por que usar o ENEM Simulator?</h2>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-trophy"></i></div>
+                        <h3>Ranking Competitivo</h3>
+                        <p>Compare seu desempenho com outros estudantes de todo o país.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-file-alt"></i></div>
+                        <h3>Questões Reais</h3>
+                        <p>Pratique com milhares de questões dos últimos anos do ENEM.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-chart-pie"></i></div>
+                        <h3>Análise de Desempenho</h3>
+                        <p>Receba relatórios detalhados para focar nos seus pontos fracos.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fas fa-mobile-alt"></i></div>
+                        <h3>Acesse Onde Quiser</h3>
+                        <p>Nossa plataforma é 100% responsiva para você estudar a qualquer hora.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const navbarToggler = document.querySelector('.navbar-toggler');
+            const navbarCollapse = document.querySelector('.navbar-collapse');
+            
+            if (navbarToggler) {
+                navbarToggler.addEventListener('click', () => {
+                    // Alterna uma classe 'active' em vez de mudar o estilo diretamente
+                    navbarCollapse.classList.toggle('active');
+                });
+            }
+            
+            const alert = document.querySelector('.alert');
+            if(alert) {
+                alert.querySelector('.close').addEventListener('click', () => alert.remove());
+                setTimeout(() => alert.remove(), 5000);
+            }
+        });
+    </script>
+</body>
+</html>

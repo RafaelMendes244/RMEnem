@@ -1,0 +1,524 @@
+/* static/css/style.css */
+
+/* ===================================================================
+ * ENEM SIMULATOR - FOLHA DE ESTILO PROFISSIONAL
+ * DESCRIÇÃO: Design coeso, moderno e responsivo para uma plataforma educacional.
+ * ===================================================================
+ * ÍNDICE:
+ * 1. Variáveis Globais (Cores, Fontes, etc.)
+ * 2. Reset e Estilos Base
+ * 3. Layout e Estrutura (Container, Grid)
+ * 4. Componentes (Botões, Cards, Formulários, Alertas)
+ * 5. Seções Específicas (Header, Hero, Páginas Internas)
+ * 6. Responsividade e Media Queries
+ * 7. Animações e Utilidades
+ * =================================================================== */
+
+/* 1. VARIÁVEIS GLOBAIS */
+:root {
+    /* Cores */
+    --color-primary: #4361ee;       /* Azul vibrante e moderno */
+    --color-primary-dark: #3a56d4;
+    --color-primary-light: #edf2f7;
+    --color-secondary: #6c757d;
+    --color-success: #198754;
+    --color-danger: #dc3545;
+    --color-warning: #ffc107;
+    --color-info: #0dcaf0;
+    --color-white: #ffffff;
+    --color-dark: #212529;
+    --color-text: #495057;
+    --color-text-muted: #6c757d;
+    --color-border: #dee2e6;
+    --color-background: #f8f9fa;
+
+    /* Tipografia */
+    --font-family-base: 'Inter', sans-serif;
+    --font-family-heading: 'Poppins', sans-serif;
+    --font-size-base: 1rem; /* 16px */
+    --line-height-base: 1.6;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+
+    /* Bordas e Sombras */
+    --border-radius: 0.5rem;
+    --border-width: 1px;
+    --box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --box-shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.1);
+
+    /* Transições */
+    --transition: all 0.3s ease-in-out;
+}
+
+/* 2. RESET E ESTILOS BASE */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+    font-family: var(--font-family-base);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height-base);
+    color: var(--color-text);
+    background-color: var(--color-background);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-family-heading); font-weight: var(--font-weight-semibold); color: var(--color-dark); line-height: 1.3; margin-bottom: 0.5rem; }
+a { color: var(--color-primary); text-decoration: none; transition: var(--transition); }
+a:hover { color: var(--color-primary-dark); text-decoration: none; }
+.text-center { text-align: center; }
+.mt-3 { margin-top: 1rem; }
+.mt-4 { margin-top: 1.5rem; }
+.mb-3 { margin-bottom: 1rem; }
+.mb-4 { margin-bottom: 1.5rem; }
+.py-4 { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+.py-5 { padding-top: 3rem; padding-bottom: 3rem; }
+.text-muted { color: var(--color-text-muted) !important; }
+.text-danger { color: var(--color-danger) !important; }
+
+/* 3. LAYOUT E ESTRUTURA */
+.container { width: 100%; padding-right: 15px; padding-left: 15px; margin-right: auto; margin-left: auto; }
+@media (min-width: 576px) { .container { max-width: 540px; } }
+@media (min-width: 768px) { .container { max-width: 720px; } }
+@media (min-width: 992px) { .container { max-width: 960px; } }
+@media (min-width: 1200px) { .container { max-width: 1140px; } }
+.main-content { padding-top: 2rem; padding-bottom: 2rem; }
+.section { padding: 3rem 0; }
+.section-title { text-align: center; margin-bottom: 3rem; }
+.provas-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+@media (min-width: 768px) { .provas-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 992px) { .provas-grid { grid-template-columns: repeat(3, 1fr); } }
+.features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; }
+
+/* 4. COMPONENTES */
+
+/* --- Botões --- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; font-weight: var(--font-weight-semibold); text-align: center; vertical-align: middle; cursor: pointer; user-select: none; border: var(--border-width) solid transparent; padding: 0.6rem 1.25rem; font-size: var(--font-size-base); border-radius: var(--border-radius); transition: var(--transition); }
+.btn:hover { transform: translateY(-2px); box-shadow: var(--box-shadow); text-decoration: none; }
+.btn:active { transform: translateY(0); box-shadow: none; }
+.btn:disabled { opacity: 0.65; cursor: not-allowed; transform: none; box-shadow: none; }
+.btn-lg { padding: 0.75rem 1.5rem; font-size: 1.1rem; }
+.btn-sm { padding: 0.25rem 0.75rem; font-size: 0.875rem; }
+.btn-block { display: flex; width: 100%; }
+.btn-primary { color: var(--color-white); background-color: var(--color-primary); border-color: var(--color-primary); }
+.btn-primary:hover { background-color: var(--color-primary-dark); border-color: var(--color-primary-dark); }
+.btn-secondary { color: var(--color-white); background-color: var(--color-secondary); border-color: var(--color-secondary); }
+.btn-danger { color: var(--color-white); background-color: var(--color-danger); border-color: var(--color-danger); }
+.btn-success { color: var(--color-white); background-color: var(--color-success); border-color: var(--color-success); }
+.btn-light { color: var(--color-primary); background-color: var(--color-white); border-color: var(--color-white); }
+.btn-outline-light { color: var(--color-white); border-color: var(--color-white); }
+.btn-outline-light:hover { color: var(--color-primary); background-color: var(--color-white); }
+.btn-google { background-color: #DB4437; color: var(--color-white); }
+.btn-google:hover { background-color: #C23321; }
+
+/* --- Cards --- */
+.card { display: flex; flex-direction: column; height: 100%; background-color: var(--color-white); border: var(--border-width) solid var(--color-border); border-radius: var(--border-radius); box-shadow: var(--box-shadow); margin-bottom: 1.5rem; transition: var(--transition); }
+.card:hover { transform: translateY(-5px); box-shadow: var(--box-shadow-lg); }
+.card-header, .card-footer { padding: 1rem 1.5rem; background-color: var(--color-background); }
+.card-header { border-bottom: var(--border-width) solid var(--color-border); }
+.card-footer { border-top: var(--border-width) solid var(--color-border); margin-top: auto; } /* Chave para o alinhamento de botões */
+.card-body { padding: 1.5rem; flex-grow: 1; } /* Chave para o alinhamento de botões */
+.card-title { font-weight: var(--font-weight-semibold); }
+.prova-card .card-body { text-align: center; }
+.prova-card p { font-size: 0.9rem; color: var(--color-text-muted); }
+
+/* --- Formulários --- */
+.form-group { margin-bottom: 1.5rem; }
+.form-label { display: block; font-weight: var(--font-weight-medium); margin-bottom: 0.5rem; }
+.form-control { display: block; width: 100%; padding: 0.75rem 1rem; font-size: var(--font-size-base); border: var(--border-width) solid var(--color-border); border-radius: var(--border-radius); transition: var(--transition); }
+.form-control:focus { border-color: var(--color-primary); outline: 0; box-shadow: 0 0 0 0.2rem rgba(67, 97, 238, 0.25); }
+.password-input { position: relative; }
+.toggle-password { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--color-text-muted); cursor: pointer; }
+
+/* --- Alertas --- */
+.alert { position: relative; padding: 1rem; margin-bottom: 1rem; border: var(--border-width) solid transparent; border-radius: var(--border-radius); }
+.alert-success { color: #0f5132; background-color: #d1e7dd; border-color: #badbcc; }
+.alert-danger { color: #842029; background-color: #f8d7da; border-color: #f5c2c7; }
+.alert .close { position: absolute; top: 0.5rem; right: 1rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+
+/* --- Badges --- */
+.badge { display: inline-block; padding: 0.35em 0.65em; font-size: 0.75em; font-weight: var(--font-weight-semibold); line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: var(--border-radius); }
+.badge-success { color: var(--color-white); background-color: var(--color-success); }
+.badge-danger { color: var(--color-white); background-color: var(--color-danger); }
+.badge-warning { color: var(--color-dark); background-color: var(--color-warning); }
+.badge-primary { color: var(--color-white); background-color: var(--color-primary); }
+
+/* 5. SEÇÕES ESPECÍFICAS */
+
+/* --- Header e Navbar --- */
+.main-header { background-color: var(--color-white); padding: 0.75rem 0; box-shadow: var(--box-shadow); position: sticky; top: 0; z-index: 1020; }
+.navbar { display: flex; justify-content: space-between; align-items: center; }
+.navbar-brand .logo { font-family: var(--font-family-heading); font-size: 1.5rem; font-weight: 600; color: var(--color-primary); }
+.navbar-nav { display: flex; align-items: center; list-style: none; gap: 0.5rem; }
+.nav-link { font-weight: var(--font-weight-medium); color: var(--color-text); padding: 0.5rem 1rem; border-radius: var(--border-radius); }
+.nav-link:hover { color: var(--color-primary); background-color: var(--color-primary-light); }
+.navbar-toggler { display: none; background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+.navbar-collapse { display: flex !important; }
+
+/* --- Hero Section --- */
+.hero { background: var(--color-primary); color: var(--color-white); padding: 4rem 0; text-align: center; }
+.hero-title { font-size: 2.5rem; font-weight: 600; color: var(--color-white); }
+.hero-subtitle { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 1rem auto 2rem auto; }
+.hero-buttons { display: flex; justify-content: center; gap: 1rem; }
+
+/* --- Features Section --- */
+.features-section { background-color: var(--color-white); }
+.feature-card { text-align: center; padding: 1.5rem; }
+.feature-icon { font-size: 2.5rem; color: var(--color-primary); margin-bottom: 1rem; display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 60px; background-color: var(--color-primary-light); border-radius: 50%; }
+
+/* --- Page Header (Telas internas) --- */
+.page-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; padding: 1.5rem; background: var(--color-white); border-radius: var(--border-radius); margin-bottom: 2rem; border: var(--border-width) solid var(--color-border); }
+.page-header h1 { font-size: 1.75rem; margin: 0; }
+.user-info { display: flex; align-items: center; gap: 0.75rem; }
+
+/* --- Login --- */
+.login-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+.login-box { width: 100%; max-width: 450px; }
+.login-header { padding: 2rem; background-color: var(--color-primary); color: var(--color-white); text-align: center; border-top-left-radius: var(--border-radius); border-top-right-radius: var(--border-radius); }
+.login-body { padding: 2rem; }
+.divider { display: flex; align-items: center; text-align: center; margin: 1.5rem 0; color: var(--color-text-muted); }
+.divider::before, .divider::after { content: ''; flex: 1; border-bottom: 1px solid var(--color-border); }
+.divider:not(:empty)::before { margin-right: .25em; }
+.divider:not(:empty)::after { margin-left: .25em; }
+
+/* --- Questões do Exame --- */
+.questoes-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; }
+.progress-info { display: flex; align-items: center; gap: 1.5rem; }
+.timer { font-weight: var(--font-weight-semibold); color: var(--color-primary); }
+.progress-wrapper { flex-grow: 1; }
+.progress-text { font-size: 0.9rem; font-weight: var(--font-weight-medium); }
+.progress { height: 8px; background-color: var(--color-border); border-radius: 4px; overflow: hidden; margin-top: 0.25rem; }
+.progress-bar { height: 100%; background-color: var(--color-primary); transition: width 0.3s ease; }
+.alternative { display: flex; padding: 1rem; border: 2px solid var(--color-border); border-radius: var(--border-radius); cursor: pointer; margin-bottom: 0.75rem; transition: var(--transition); }
+.alternative:hover { border-color: var(--color-primary); background-color: var(--color-primary-light); }
+.alternative input[type="radio"] { margin-right: 1rem; }
+.alternative.selected { border-color: var(--color-primary); background-color: var(--color-primary-light); }
+
+/* --- Resultado --- */
+.resultado-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; }
+.summary-item { display: flex; align-items: center; gap: 1rem; background-color: var(--color-primary-light); padding: 1rem; border-radius: var(--border-radius); }
+.summary-item.highlight { background-color: var(--color-success); color: var(--color-white); }
+.summary-item.highlight .summary-icon { background-color: rgba(255,255,255,0.2); }
+.summary-icon { font-size: 1.5rem; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: var(--color-primary); color: var(--color-white); }
+.summary-value { font-size: 1.25rem; font-weight: var(--font-weight-semibold); }
+.question-detail-card { border-left: 5px solid var(--color-border); margin-bottom: 1rem; }
+.question-detail-card.correct { border-left-color: var(--color-success); }
+.question-detail-card.incorrect { border-left-color: var(--color-danger); }
+.detail-alternative { padding: 0.75rem; border-radius: var(--border-radius); margin-bottom: 0.5rem; }
+.detail-alternative.user-correct { background-color: #d1e7dd; }
+.detail-alternative.user-incorrect { background-color: #f8d7da; border: 2px solid var(--color-danger); }
+.detail-alternative.correct-answer-highlight { font-weight: var(--font-weight-semibold); background-color: #d1e7dd; border: 2px solid var(--color-success); }
+.answer-comparison { border-top: 1px solid var(--color-border); padding-top: 1rem; }
+
+/* --- Ranking --- */
+.table-responsive { overflow-x: auto; }
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--color-border); }
+.table thead { background-color: var(--color-primary-light); }
+.table tbody tr:hover { background-color: #f1f3f5; }
+
+/* 6. RESPONSIVIDADE */
+@media (max-width: 768px) {
+    .navbar-toggler { display: block; }
+    .navbar-collapse { display: none; width: 100%; }
+    .navbar-collapse.show { display: block; }
+    .navbar-nav { flex-direction: column; align-items: flex-start; gap: 0; }
+    .nav-link { width: 100%; }
+    .hero-title { font-size: 2rem; }
+    .hero-buttons { flex-direction: column; }
+    .page-header { flex-direction: column; align-items: flex-start; }
+
+    /* Tabela Responsiva */
+    .table thead { display: none; }
+    .table tr { display: block; margin-bottom: 1rem; border: 1px solid var(--color-border); border-radius: var(--border-radius); }
+    .table td { display: block; text-align: right; padding-left: 50%; position: relative; }
+    .table td::before { content: attr(data-label); position: absolute; left: 1rem; width: calc(50% - 2rem); text-align: left; font-weight: var(--font-weight-semibold); color: var(--color-primary); }
+}
+
+/* 7. UTILIDADES E ANIMAÇÕES */
+.spinner-wrapper { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 3rem; color: var(--color-text-muted); }
+@keyframes spin { to { transform: rotate(360deg); } }
+.fa-spinner { animation: spin 1s linear infinite; }
+
+/* 1. Reset Básico e Estilos Globais */
+:root {
+    --primary-color: #3B82F6; /* Azul Principal */
+    --primary-dark: #2563EB;
+    --light-color: #FFFFFF;
+    --text-color: #E0E7FF; /* Texto mais suave no fundo azul */
+    --dark-text-color: #374151;
+    --background-color: #F9FAFB;
+    --border-color: #D1D5DB;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+    color: var(--dark-text-color);
+    background-color: var(--background-color);
+}
+
+.container {
+    width: 100%;
+    padding: 0 20px;
+    margin: 0 auto;
+}
+
+/* 2. Estilos do Header e Navbar (Mobile First) */
+.main-header {
+    background-color: var(--primary-color);
+    padding: 15px 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navbar-brand .logo {
+    font-family: 'Poppins', sans-serif;
+    font-size: 24px;
+    color: var(--light-color);
+    text-decoration: none;
+}
+
+.navbar-toggler {
+    display: block; /* Visível em mobile */
+    background: none;
+    border: none;
+    color: var(--light-color);
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.navbar-collapse {
+    display: none; /* Escondido por padrão em mobile */
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    background-color: var(--light-color);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease-out;
+}
+
+.navbar-collapse.active {
+    display: block; /* Ativado via JS */
+    max-height: 500px; /* Altura suficiente para os links */
+}
+
+.navbar-nav {
+    list-style: none;
+    padding: 10px 0;
+}
+
+.navbar-nav li a {
+    display: block;
+    padding: 15px 20px;
+    color: var(--dark-text-color);
+    text-decoration: none;
+    transition: background-color 0.3s;
+}
+
+.navbar-nav li a:hover {
+    background-color: var(--background-color);
+}
+
+.navbar-nav li a .fas {
+    margin-right: 10px;
+}
+
+/* 3. Estilos da Seção Hero (Mobile First) */
+.hero {
+    background-color: var(--primary-color);
+    color: var(--light-color);
+    padding: 60px 0;
+    text-align: center;
+}
+
+.hero-title {
+    font-family: 'Poppins', sans-serif;
+    font-size: 2.2rem;
+    margin-bottom: 15px;
+}
+
+.hero-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-color);
+    margin-bottom: 30px;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.hero-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+}
+
+.btn {
+    display: inline-block;
+    padding: 12px 28px;
+    border-radius: 8px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+.btn-lg {
+    padding: 15px 35px;
+    font-size: 1.1rem;
+}
+
+.btn-light {
+    background-color: var(--light-color);
+    color: var(--primary-dark);
+}
+
+.btn-light:hover {
+    background-color: #f0f0f0;
+}
+
+.btn-outline-light {
+    background-color: transparent;
+    color: var(--light-color);
+    border: 2px solid var(--light-color);
+}
+
+.btn-outline-light:hover {
+    background-color: var(--light-color);
+    color: var(--primary-dark);
+}
+
+/* 4. Estilos da Seção de Features (Mobile First) */
+.section {
+    padding: 60px 0;
+}
+
+.section-title {
+    text-align: center;
+    font-family: 'Poppins', sans-serif;
+    font-size: 2rem;
+    margin-bottom: 40px;
+}
+
+.features-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
+}
+
+.feature-card {
+    background-color: var(--light-color);
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+.feature-icon {
+    font-size: 2.5rem;
+    color: var(--primary-color);
+    margin-bottom: 15px;
+}
+
+.feature-card h3 {
+    font-family: 'Poppins', sans-serif;
+    font-size: 1.5rem;
+    margin-bottom: 10px;
+}
+
+/* 5. Alertas */
+.alert {
+    padding: 15px;
+    background-color: #28a745;
+    color: white;
+    margin-bottom: 20px;
+    border-radius: 5px;
+    position: relative;
+}
+.alert .close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    color: white;
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+}
+
+
+/* 6. Media Queries para Telas Maiores (Desktop) */
+@media (min-width: 768px) {
+    .container {
+        max-width: 1100px;
+    }
+
+    .navbar-toggler {
+        display: none; /* Esconde o "hambúrguer" no desktop */
+    }
+
+    .navbar-collapse {
+        display: block; /* Mostra o menu no desktop */
+        position: static;
+        width: auto;
+        background-color: transparent;
+        box-shadow: none;
+        max-height: none;
+        overflow: visible;
+    }
+
+    .navbar-nav {
+        flex-direction: row;
+        align-items: center;
+        gap: 15px;
+        padding: 0;
+    }
+    
+    .navbar-nav li a {
+        color: var(--light-color);
+        padding: 8px 15px;
+        border-radius: 6px;
+    }
+
+    .navbar-nav li a:hover {
+        background-color: var(--primary-dark);
+    }
+
+    .hero-buttons {
+        flex-direction: row;
+        justify-content: center;
+    }
+    
+    .hero-title {
+        font-size: 3rem;
+    }
+
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 30px;
+    }
+}
+
+@media (min-width: 1024px) {
+    .features-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
