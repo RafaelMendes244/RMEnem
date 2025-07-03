@@ -56,6 +56,27 @@ def init_db():
             FOREIGN KEY (simulado_id) REFERENCES simulados (id)
         )
         ''')
+        
+        # --- CÓDIGO NOVO ADICIONADO AQUI ---
+        conn.execute('''
+        CREATE TABLE IF NOT EXISTS redacoes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_email TEXT NOT NULL,
+            tema TEXT NOT NULL,
+            texto_redacao TEXT NOT NULL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+            nota_total INTEGER,
+            nota_c1 INTEGER,
+            nota_c2 INTEGER,
+            nota_c3 INTEGER,
+            nota_c4 INTEGER,
+            nota_c5 INTEGER,
+            feedback TEXT,
+            FOREIGN KEY (user_email) REFERENCES users (email)
+        )
+        ''')
+        # --- FIM DO CÓDIGO NOVO ---
+
         conn.commit()
         conn.close()
 

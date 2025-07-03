@@ -1,7 +1,13 @@
 // static/js/exame.js
 
 document.addEventListener('DOMContentLoaded', () => {
-    const provasList = document.getElementById('provas-list');
+    // --- Referências aos elementos do HTML ---
+    const simuladoForm = document.getElementById('simulado-form');
+    const anoSelect = document.getElementById('ano-select');
+    const disciplinaSelect = document.getElementById('disciplina-select');
+    const questoesInput = document.getElementById('questoes-input');
+    const gerarBtn = simuladoForm.querySelector('button[type="submit"]');
+
     const provaSelection = document.getElementById('prova-selection');
     const questoesContainer = document.getElementById('questoes-container');
     const provaTitle = document.getElementById('prova-title');
@@ -10,106 +16,121 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressText = document.getElementById('progress-text');
     const progressBar = document.getElementById('progress-bar');
     const timerDisplaySpan = document.querySelector('#timer-display span');
-
-    let allQuestionsForSelectedYear = [];
+    
+    // --- Variáveis de estado ---
     let questionsToSolve = [];
     let userAnswers = {};
-    let selectedYear = null;
-    let startTime = null;
     let timerInterval = null;
+    let startTime = null;
 
-    const SIMULADO_DURATION_SECONDS = 45 * 60;
-    const NUMBER_OF_QUESTIONS_FOR_SIMULADO = 10;
+    // --- URL da SUA API ---
+    const API_BASE_URL = 'https://enem-api-gules.vercel.app/v1';
 
+    // --- Funções do Timer (sem alterações) ---
     const formatTime = (totalSeconds) => {
         if (totalSeconds < 0) totalSeconds = 0;
-        const minutes = Math.floor(totalSeconds / 60);
-        const seconds = totalSeconds % 60;
-        return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
     };
 
     const startTimer = () => {
-        let remainingTime = SIMULADO_DURATION_SECONDS;
+        startTime = Date.now();
+        const DURATION_SECONDS = questionsToSolve.length * 3 * 60; // 3 minutos por questão
+        let remainingTime = DURATION_SECONDS;
         timerDisplaySpan.textContent = formatTime(remainingTime);
+        
         timerInterval = setInterval(() => {
             remainingTime--;
             timerDisplaySpan.textContent = formatTime(remainingTime);
             if (remainingTime <= 0) {
                 clearInterval(timerInterval);
-                alert('O tempo para o simulado acabou! Suas respostas serão enviadas automaticamente.');
+                alert('O tempo para o simulado acabou!');
                 submitAnswers(true);
             }
         }, 1000);
     };
+    
+    const stopTimer = () => clearInterval(timerInterval);
 
-    const stopTimer = () => {
-        clearInterval(timerInterval);
-        timerInterval = null;
-    };
+    // --- NOVA LÓGICA DO SIMULADO ---
 
-    const loadProvas = async () => {
+    const loadAvailableYears = async () => {
         try {
-            const response = await fetch('/api/provas');
+            const response = await fetch(`${API_BASE_URL}/exams`);
             const data = await response.json();
-            if (data.error) throw new Error(data.error);
+            if (data.error || !Array.isArray(data)) throw new Error('Resposta inválida da API de provas.');
 
-            if (data.length > 0) {
-                provasList.innerHTML = '';
-                data.forEach(prova => {
-                    const provaCard = document.createElement('div');
-                    provaCard.className = 'card prova-card';
-                    // AJUSTE NO HTML GERADO PARA PADRONIZAR COM .card-footer
-                    provaCard.innerHTML = `
-                        <div class="card-body">
-                            <h3 class="card-title">${prova.title} (${prova.year})</h3>
-                            <p>Disciplinas: ${prova.disciplines.map(d => d.label).join(', ')}</p>
-                        </div>
-                        <div class="card-footer">
-                             <button class="btn btn-primary btn-block select-prova-btn" data-year="${prova.year}">
-                                <i class="fas fa-hand-pointer"></i> Selecionar Prova
-                            </button>
-                        </div>
-                    `;
-                    provasList.appendChild(provaCard);
-                });
-
-                document.querySelectorAll('.select-prova-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        selectedYear = e.currentTarget.dataset.year;
-                        loadAndPrepareQuestionsForYear(selectedYear);
-                    });
-                });
-            } else {
-                provasList.innerHTML = '<p>Nenhuma prova disponível no momento.</p>';
-            }
+            const years = [...new Set(data.map(prova => prova.year))]; // Pega anos únicos
+            
+            anoSelect.innerHTML = '<option value="">Selecione um ano</option>';
+            years.sort((a, b) => b - a)
+               .forEach(year => {
+                const option = document.createElement('option');
+                option.value = year;
+                option.textContent = year;
+                anoSelect.appendChild(option);
+            });
         } catch (error) {
-            console.error('Erro ao carregar provas:', error);
-            provasList.innerHTML = '<p class="text-danger">Não foi possível carregar as provas. Tente novamente mais tarde.</p>';
+            console.error('Erro ao carregar anos:', error);
+            anoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
         }
     };
 
-    const loadAndPrepareQuestionsForYear = async (year) => {
+    const gerarSimuladoPersonalizado = async (event) => {
+        event.preventDefault();
+
+        const ano = anoSelect.value;
+        const disciplina = disciplinaSelect.value;
+        const numQuestoes = parseInt(questoesInput.value, 10);
+
+        if (!ano) {
+            alert('Por favor, selecione um ano para começar.');
+            return;
+        }
+        
+        gerarBtn.disabled = true;
+        gerarBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Gerando...`;
+
+        provaTitle.textContent = `Carregando simulado de ${disciplina.replace('-', ' ')} ${ano}...`;
         provaSelection.style.display = 'none';
         questoesContainer.style.display = 'block';
-        provaTitle.textContent = `Simulado ENEM ${year}`;
+        questoesList.innerHTML = `<div class="card text-center"><div class="card-body py-5"><i class="fas fa-spinner fa-spin fa-2x"></i></div></div>`;
 
         try {
-            const response = await fetch(`/api/provas/${year}/questoes`);
+            const url = `${API_BASE_URL}/exams/${ano}/questions?limit=180`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`A API retornou um erro: ${response.statusText}`);
+            
             const data = await response.json();
-            if (data.error) throw new Error(data.error);
+            if (data.error) throw new Error(data.error.message || 'Erro desconhecido da API.');
+            if (!data.questions || data.questions.length === 0) throw new Error('A API não retornou nenhuma questão para este ano.');
 
-            allQuestionsForSelectedYear = data.questions;
-            if (!allQuestionsForSelectedYear || allQuestionsForSelectedYear.length < NUMBER_OF_QUESTIONS_FOR_SIMULADO) {
-                alert(`Não há questões suficientes para o ano ${year}. Tente outro ano.`);
-                provaSelection.style.display = 'block';
-                questoesContainer.style.display = 'none';
-                return;
+            const questoesDaDisciplina = data.questions.filter(q => q.discipline === disciplina);
+
+            if (questoesDaDisciplina.length === 0) {
+                 throw new Error(`Nenhuma questão de "${disciplina.replace('-', ' ')}" encontrada para ${ano}. Tente outra disciplina.`);
             }
-            questionsToSolve = shuffleArray(allQuestionsForSelectedYear).slice(0, NUMBER_OF_QUESTIONS_FOR_SIMULADO);
+
+            if (questoesDaDisciplina.length < numQuestoes) {
+                alert(`A disciplina selecionada tem apenas ${questoesDaDisciplina.length} questões. O simulado será gerado com este número.`);
+                questionsToSolve = shuffleArray(questoesDaDisciplina);
+            } else {
+                questionsToSolve = shuffleArray(questoesDaDisciplina).slice(0, numQuestoes);
+            }
+            
+            provaTitle.textContent = `Simulado ENEM ${ano} - ${questionsToSolve.length} questões de ${disciplina.replace('-', ' ')}`;
             renderQuestionsToDom(questionsToSolve);
+
         } catch (error) {
-            console.error('Erro ao carregar questões:', error);
-            alert('Não foi possível carregar as questões do simulado.');
+            console.error('Erro ao gerar simulado:', error);
+            alert(`Erro: ${error.message}`);
+            provaSelection.style.display = 'block';
+            questoesContainer.style.display = 'none';
+        } finally {
+            gerarBtn.disabled = false;
+            gerarBtn.innerHTML = `<i class="fas fa-play"></i> Gerar Simulado`;
         }
     };
 
@@ -122,26 +143,26 @@ document.addEventListener('DOMContentLoaded', () => {
             questionCard.className = 'card';
             
             let alternativesHtml = '';
-            const letters = ['A', 'B', 'C', 'D', 'E'];
-            const questionUniqueId = q.id || q.title || `questao-${q.year}-${q.index}`;
+            // MELHORIA: Usar o ID da questão que vem da API, que é 100% único
+            const questionUniqueId = q.id; 
 
-            letters.forEach(letter => {
-                const alt = q.alternatives?.find(a => a.letter === letter);
-                if (alt?.text) {
-                    alternativesHtml += `
-                        <label class="alternative">
-                            <input type="radio" name="question-${questionUniqueId}" value="${alt.letter}" data-question-id="${questionUniqueId}">
-                            <strong>${alt.letter})</strong> <div>${marked.parse(alt.text)}</div>
-                        </label>`;
-                }
+            q.alternatives?.forEach(alt => {
+                alternativesHtml += `
+                    <label class="alternative">
+                        <input type="radio" name="question-${index}" value="${alt.letter}" data-question-id="${questionUniqueId}">
+                        <strong>${alt.letter})</strong> <div>${marked.parse(alt.text || '')}</div>
+                    </label>`;
             });
+
+            // Converte links de imagens em tags <img> no contexto
+            const contextHtml = (q.context || '').replace(/!\[.*?\]\((.*?)\)/g, '<img src="$1" alt="Imagem da questão" class="img-fluid my-2">');
 
             questionCard.innerHTML = `
                 <div class="card-header">
-                    <strong>Questão ${index + 1}</strong> - ${q.discipline || 'Área não especificada'}
+                    <strong>Questão ${index + 1}</strong>
                 </div>
                 <div class="card-body">
-                    <div>${marked.parse(q.context || '')}</div>
+                    <div>${marked.parse(contextHtml)}</div>
                     <div class="mt-3">${marked.parse(q.alternativesIntroduction || '')}</div>
                     <div class="mt-3">${alternativesHtml}</div>
                 </div>`;
@@ -151,7 +172,9 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelectorAll('input[type="radio"]').forEach(input => {
             input.addEventListener('change', (e) => {
                 userAnswers[e.target.dataset.questionId] = e.target.value;
-                document.querySelectorAll(`label.alternative.selected`).forEach(l => l.classList.remove('selected'));
+                document.querySelectorAll(`input[name="${e.target.name}"]`).forEach(radio => {
+                     radio.closest('label').classList.remove('selected');
+                });
                 e.target.closest('label').classList.add('selected');
                 updateProgress();
             });
@@ -186,14 +209,17 @@ document.addEventListener('DOMContentLoaded', () => {
         submitBtn.disabled = true;
         submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Enviando...`;
 
+        const ano = anoSelect.value;
+        const duracaoSegundos = Math.floor((Date.now() - startTime) / 1000);
+
         try {
             const response = await fetch('/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    year: selectedYear,
+                    year: ano,
                     respostas: userAnswers,
-                    duracaoSegundos: Math.floor((Date.now() - startTime) / 1000)
+                    duracaoSegundos: duracaoSegundos
                 })
             });
             const data = await response.json();
@@ -208,7 +234,11 @@ document.addEventListener('DOMContentLoaded', () => {
             submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Enviar Respostas e Ver Resultado`;
         }
     };
-
+    
+    // --- Event Listeners ---
+    simuladoForm.addEventListener('submit', gerarSimuladoPersonalizado);
     submitBtn.addEventListener('click', () => submitAnswers());
-    loadProvas();
+    
+    // --- Inicialização ---
+    loadAvailableYears();
 });
