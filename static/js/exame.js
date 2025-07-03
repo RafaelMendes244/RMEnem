@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const startTimer = () => {
         startTime = Date.now();
-        const DURATION_SECONDS = questionsToSolve.length * 3 * 60;
+        const DURATION_SECONDS = questionsToSolve.length * 3 * 60; // 3 minutos por questão
         let remainingTime = DURATION_SECONDS;
         if (timerDisplaySpan) timerDisplaySpan.textContent = formatTime(remainingTime);
         
@@ -136,94 +136,90 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const renderQuestionsToDom = (questions) => {
-        questoesList.innerHTML = '';
-        userAnswers = {};
 
-        questions.forEach((q, index) => {
-            const questionCard = document.createElement('div');
-            questionCard.className = 'card question-card';
+const renderQuestionsToDom = (questions) => {
+    questoesList.innerHTML = '';
+    userAnswers = {};
+
+    questions.forEach((q, index) => {
+        const questionCard = document.createElement('div');
+        questionCard.className = 'card question-card';
+        
+        const cardHeader = document.createElement('div');
+        cardHeader.className = 'card-header';
+        cardHeader.innerHTML = `<strong>Questão ${index + 1}</strong>`;
+
+        const cardBody = document.createElement('div');
+        cardBody.className = 'card-body';
+
+        // Adiciona o contexto e as imagens principais da questão
+        if (q.context) {
+            const contextHtml = (q.context).replace(/!\[.*?\]\((.*?)\)/g, '<img src="$1" alt="Imagem da questão" class="img-fluid my-2">');
+            cardBody.innerHTML += marked.parse(contextHtml);
+        }
+        if (q.files && q.files.length > 0) {
+            q.files.forEach(fileUrl => {
+                cardBody.innerHTML += `<img src="${fileUrl}" alt="Imagem da questão" class="img-fluid my-2">`;
+            });
+        }
+        if (q.alternativesIntroduction) {
+            cardBody.innerHTML += `<div class="mt-3">${marked.parse(q.alternativesIntroduction)}</div>`;
+        }
+        
+        const alternativesContainer = document.createElement('div');
+        alternativesContainer.className = 'mt-3';
+
+        // Lógica corrigida para criar as alternativas
+        q.alternatives?.forEach(alt => {
+            const label = document.createElement('label');
+            label.className = 'alternative';
+
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = `question-${index}`;
+            radio.value = alt.letter;
             
-            const cardHeader = document.createElement('div');
-            cardHeader.className = 'card-header';
-            cardHeader.innerHTML = `<strong>Questão ${index + 1}</strong>`;
-
-            const cardBody = document.createElement('div');
-            cardBody.className = 'card-body';
-
-            if (q.context) {
-                const contextDiv = document.createElement('div');
-                const contextHtml = (q.context).replace(/!\[.*?\]\((.*?)\)/g, '<img src="$1" alt="Imagem da questão" class="img-fluid my-2">');
-                contextDiv.innerHTML = marked.parse(contextHtml);
-                cardBody.appendChild(contextDiv);
-            }
-
-            if (q.files && q.files.length > 0) {
-                q.files.forEach(fileUrl => {
-                    const img = document.createElement('img');
-                    img.src = fileUrl;
-                    img.alt = "Imagem da questão";
-                    img.className = 'img-fluid my-2';
-                    cardBody.appendChild(img);
-                });
-            }
-
-            if (q.alternativesIntroduction) {
-                const introDiv = document.createElement('div');
-                introDiv.className = 'mt-3';
-                introDiv.innerHTML = marked.parse(q.alternativesIntroduction);
-                cardBody.appendChild(introDiv);
-            }
-            
-            const alternativesContainer = document.createElement('div');
-            alternativesContainer.className = 'mt-3';
-
-            q.alternatives?.forEach(alt => {
-                const label = document.createElement('label');
-                label.className = 'alternative';
-
-                const radio = document.createElement('input');
-                radio.type = 'radio';
-                radio.name = `question-${index}`;
-                radio.value = alt.letter;
-                
-                // CORREÇÃO DEFINITIVA DO BUG DE CONTAGEM E SELEÇÃO
-                radio.addEventListener('change', () => {
-                    // Usamos o TÍTULO como ID único, pois o backend já usa ele
-                    const questionUniqueId = q.title;
-                    userAnswers[questionUniqueId] = radio.value;
-                    
-                    // Remove o realce de todas as alternativas desta questão
-                    alternativesContainer.querySelectorAll('.alternative').forEach(l => l.classList.remove('selected'));
-                    
-                    // Adiciona o realce na alternativa clicada
-                    label.classList.add('selected');
-
-                    // Atualiza a barra de progresso
-                    updateProgress();
-                });
-
-                const strong = document.createElement('strong');
-                strong.textContent = `${alt.letter}) `;
-
-                const divText = document.createElement('div');
-                divText.innerHTML = marked.parse(alt.text || '');
-
-                label.appendChild(radio);
-                label.appendChild(strong);
-                label.appendChild(divText);
-                alternativesContainer.appendChild(label);
+            radio.addEventListener('change', () => {
+                userAnswers[q.title] = radio.value;
+                questionCard.querySelectorAll('.alternative').forEach(l => l.classList.remove('selected'));
+                label.classList.add('selected');
+                updateProgress();
             });
 
-            cardBody.appendChild(alternativesContainer);
-            questionCard.appendChild(cardHeader);
-            questionCard.appendChild(cardBody);
-            questoesList.appendChild(questionCard);
+            const strong = document.createElement('strong');
+            strong.textContent = `${alt.letter}) `;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'alternative-content';
+
+            // LÓGICA CORRIGIDA: Trata texto e imagem separadamente
+            if (alt.text) {
+                // Usa textContent para segurança e simplicidade, evitando erros de formatação
+                contentDiv.textContent = alt.text;
+            }
+            if (alt.file) {
+                const img = document.createElement('img');
+                img.src = alt.file;
+                img.alt = `Alternativa ${alt.letter}`;
+                img.className = 'img-fluid-alternative';
+                contentDiv.appendChild(img);
+            }
+            
+            label.appendChild(radio);
+            label.appendChild(strong);
+            label.appendChild(contentDiv);
+            alternativesContainer.appendChild(label);
         });
 
-        updateProgress();
-        startTimer();
-    };
+        cardBody.appendChild(alternativesContainer);
+        questionCard.appendChild(cardHeader);
+        questionCard.appendChild(cardBody);
+        questoesList.appendChild(questionCard);
+    });
+
+    updateProgress();
+    startTimer();
+};
     
     const shuffleArray = (array) => {
         for (let i = array.length - 1; i > 0; i--) {
@@ -253,7 +249,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const ano = anoSelect.value;
         const duracaoSegundos = Math.floor((Date.now() - startTime) / 1000);
 
-        // CORREÇÃO: Usar os títulos das questões como ID na submissão
         const respostasParaEnviar = {};
         questionsToSolve.forEach(q => {
             if (userAnswers[q.title]) {

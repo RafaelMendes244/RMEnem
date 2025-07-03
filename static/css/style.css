@@ -531,3 +531,12 @@ body {
     text-align: center;
     font-size: 0.9rem;
 }
+
+/* Estilo para imagens dentro das alternativas */
+.img-fluid-alternative {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    border-radius: var(--border-radius);
+    margin-top: 0.5rem; /* Adiciona um espaço se houver texto acima */
+}
