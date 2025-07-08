@@ -144,14 +144,14 @@ def login_email():
     if not user:
         flash('Usuário não cadastrado.') # Mensagem específica
     elif not check_password_hash(user['password'], password):
-        flash('Senha incorreta.') # Mensagem específica
+        flash('Senha Incorreta!', 'success')
     else:
         # Se usuário existe e a senha está correta
         session['user'] = {
             'email': user['email'],
             'name': user['name'] or user['email'].split('@')[0]
         }
-        # Não precisa de flash aqui, o redirecionamento já indica o sucesso
+        flash('Login Efetuado com Sucesso.', 'success')
         return redirect(url_for('index'))
     
     # Se chegou aqui, é porque deu algum erro, então redireciona de volta para o login
@@ -187,8 +187,7 @@ def register():
 def login():
     if 'user' in session:
         return redirect(url_for('index'))
-    messages = session.pop('_flashes', [])
-    return render_template('login.html', messages=messages)
+    return render_template('login.html')
 
 @app.route("/logout")
 def logout():
@@ -582,6 +581,39 @@ def get_ranking_geral():
 def ranking_page():
     user = session.get('user')
     return render_template('ranking.html', user=user)
+
+# Rota de Admin para visualizar o banco de dados
+# O 'secret_key' na URL é uma forma simples de proteger a página
+@app.route('/admin/view_db/<secret_key>')
+def view_db(secret_key):
+    # Pega a chave secreta que você vai configurar no Render
+    admin_secret = os.getenv('ADMIN_SECRET_KEY')
+    
+    # Se a chave não existir ou for diferente, nega o acesso
+    if not admin_secret or secret_key != admin_secret:
+        return "Acesso não autorizado.", 403
+
+    try:
+        conn = get_db_connection()
+        
+        # Pega o nome de todas as tabelas no banco de dados
+        tables_cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = [table['name'] for table in tables_cursor.fetchall()]
+        
+        # Pega os dados de cada tabela
+        db_data = {}
+        for table_name in tables:
+            # Evita que a tabela de sessões seja exibida se existir
+            if table_name != 'sessions':
+                data_cursor = conn.execute(f"SELECT * FROM {table_name}")
+                db_data[table_name] = data_cursor.fetchall()
+        
+        conn.close()
+        
+        # Renderiza um novo template HTML com os dados
+        return render_template('admin_view.html', db_data=db_data)
+    except Exception as e:
+        return f"Ocorreu um erro ao acessar o banco de dados: {e}"
 
 if __name__ == '__main__':
     app.run(debug=True)
