@@ -15,14 +15,14 @@
                 <h2>Simulador Enem - RM</h2>
             </div>
             <div class="login-body">
-                {% with messages = get_flashed_messages() %}
-                {% if messages %}
-                <div class="alert alert-danger">
-                    {% for message in messages %}
-                    <div>{{ message }}</div>
-                    {% endfor %}
-                </div>
-                {% endif %}
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="alert alert-{{ category or 'info' }}"> 
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    {% endif %}
                 {% endwith %}
 
                 <div id="login-form-container">

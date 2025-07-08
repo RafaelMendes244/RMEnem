@@ -140,16 +140,22 @@ def login_email():
     user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
     conn.close()
     
-    if user and check_password_hash(user['password'], password):
+    # Lógica aprimorada para feedback específico
+    if not user:
+        flash('Usuário não cadastrado.') # Mensagem específica
+    elif not check_password_hash(user['password'], password):
+        flash('Senha incorreta.') # Mensagem específica
+    else:
+        # Se usuário existe e a senha está correta
         session['user'] = {
             'email': user['email'],
             'name': user['name'] or user['email'].split('@')[0]
         }
-        flash('Login realizado com sucesso!')
+        # Não precisa de flash aqui, o redirecionamento já indica o sucesso
         return redirect(url_for('index'))
-    else:
-        flash('Email ou senha incorretos.')
-        return redirect(url_for('login'))
+    
+    # Se chegou aqui, é porque deu algum erro, então redireciona de volta para o login
+    return redirect(url_for('login'))
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -173,7 +179,8 @@ def register():
         flash('Cadastro realizado com sucesso!')
         return redirect(url_for('index'))
     except sqlite3.IntegrityError:
-        flash('Email já cadastrado.')
+        # Mensagem mais clara
+        flash('Este email já está cadastrado. Por favor, tente fazer o login.')
         return redirect(url_for('login'))
 
 @app.route("/login")
@@ -186,7 +193,7 @@ def login():
 @app.route("/logout")
 def logout():
     session.pop('user', None)
-    flash('Você foi desconectado.')
+    flash('Você foi desconectado com sucesso.', 'success') # Adicionando categoria de sucesso
     return redirect(url_for('index'))
 
 @app.route('/exame')
