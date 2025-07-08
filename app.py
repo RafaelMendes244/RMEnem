@@ -23,7 +23,32 @@ ENEM_API_BASE_URL = 'https://api.enem.dev/v1'
 def get_db_connection():
     conn = sqlite3.connect('database.db')
     conn.row_factory = sqlite3.Row
+    # Configuração para reduzir chance de locking
+    conn.execute("PRAGMA journal_mode=WAL")  # Modo Write-Ahead Logging
+    conn.execute("PRAGMA busy_timeout=30000")  # Timeout de 30 segundos
     return conn
+
+from functools import wraps
+from flask import g
+
+def with_db_connection(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        conn = None
+        try:
+            conn = get_db_connection()
+            g.db = conn
+            result = func(*args, **kwargs)
+            conn.commit()
+            return result
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            raise e
+        finally:
+            if conn:
+                conn.close()
+    return wrapper
 
 # Criar tabelas de usuários, simulados e respostas_simulado
 def init_db():
@@ -158,6 +183,7 @@ def login_email():
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['POST'])
+@with_db_connection
 def register():
     email = request.form['email']
     password = request.form['password']
@@ -166,21 +192,24 @@ def register():
     hashed_password = generate_password_hash(password)
     
     try:
-        conn = get_db_connection()
-        conn.execute('INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
+        # Usamos g.db que foi criado pelo decorator
+        cursor = g.db.execute('SELECT 1 FROM users WHERE email = ?', (email,))
+        if cursor.fetchone():
+            flash('Este email já está cadastrado. Por favor, tente fazer o login.', 'error')
+            return redirect(url_for('login'))
+
+        g.db.execute('INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
                     (email, hashed_password, name))
-        conn.commit()
-        conn.close()
         
         session['user'] = {
             'email': email,
             'name': name or email.split('@')[0]
         }
-        flash('Cadastro realizado com sucesso!')
+        flash('Cadastro realizado com sucesso!', 'success')
         return redirect(url_for('index'))
-    except sqlite3.IntegrityError:
-        # Mensagem mais clara
-        flash('Este email já está cadastrado. Por favor, tente fazer o login.')
+        
+    except Exception as e:
+        flash(f'Ocorreu um erro inesperado: {str(e)}', 'error')
         return redirect(url_for('login'))
 
 @app.route("/login")
