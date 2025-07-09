@@ -1,35 +1,43 @@
-# app.py
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
-from flask_dance.contrib.google import make_google_blueprint, google
-import requests
+# ===================================================================
+# RM ENEM SIMULADOR - ARQUIVO PRINCIPAL DA APLICAÇÃO FLASK
+# ===================================================================
+
+# --- 1. Imports de Bibliotecas ---
 import os
-from dotenv import load_dotenv
+import requests
 import sqlite3
 import json
-from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
+from functools import wraps
+from dotenv import load_dotenv
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, g
+from werkzeug.security import generate_password_hash, check_password_hash
+import google.generativeai as genai
 
+# Carrega as variáveis de ambiente do arquivo .env
 load_dotenv()
 
+# --- 2. Configuração da Aplicação ---
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 
 # Configuração da API ENEM
 ENEM_API_KEY = os.getenv('API_ENEM_KEY')
-ENEM_API_BASE_URL = 'https://api.enem.dev/v1'
+ENEM_API_BASE_URL = 'https://enem-api-gules.vercel.app/v1'
 
+# Configuração da API Gemini
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Configuração do banco de dados
+# Otimização: Cache em memória para as questões
+questions_cache = {}
+
+# --- 3. Configuração do Banco de Dados ---
 def get_db_connection():
     conn = sqlite3.connect('database.db')
     conn.row_factory = sqlite3.Row
-    # Configuração para reduzir chance de locking
     conn.execute("PRAGMA journal_mode=WAL")  # Modo Write-Ahead Logging
     conn.execute("PRAGMA busy_timeout=30000")  # Timeout de 30 segundos
     return conn
-
-from functools import wraps
-from flask import g
 
 def with_db_connection(func):
     @wraps(func)
@@ -44,13 +52,13 @@ def with_db_connection(func):
         except Exception as e:
             if conn:
                 conn.rollback()
+            app.logger.error(f"Database error: {e}")
             raise e
         finally:
             if conn:
                 conn.close()
     return wrapper
 
-# Criar tabelas de usuários, simulados e respostas_simulado
 def init_db():
     with app.app_context():
         conn = get_db_connection()
@@ -81,8 +89,6 @@ def init_db():
             FOREIGN KEY (simulado_id) REFERENCES simulados (id)
         )
         ''')
-        
-        # --- CÓDIGO NOVO ADICIONADO AQUI ---
         conn.execute('''
         CREATE TABLE IF NOT EXISTS redacoes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -100,61 +106,53 @@ def init_db():
             FOREIGN KEY (user_email) REFERENCES users (email)
         )
         ''')
-        # --- FIM DO CÓDIGO NOVO ---
-
         conn.commit()
         conn.close()
 
 init_db()
 
-# Configuração do OAuth com Google
-google_bp = make_google_blueprint(
-    client_id=os.getenv('GOOGLE_CLIENT_ID'),
-    client_secret=os.getenv('GOOGLE_CLIENT_SECRET'),
-    scope=["profile", "email"],
-    redirect_to="google.authorized"
-)
-app.register_blueprint(google_bp, url_prefix="/login")
+# --- 4. Decorators ---
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            flash('Você precisa estar logado para acessar esta página.', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
+# --- 5. Funções Auxiliares ---
+def get_questions_from_api_with_cache(year):
+    if year in questions_cache:
+        return questions_cache[year]
+    try:
+        response = requests.get(f'{ENEM_API_BASE_URL}/exams/{year}/questions?limit=180')
+        response.raise_for_status()
+        data = response.json().get('questions', [])
+        questions_cache[year] = data
+        return data
+    except Exception as e:
+        app.logger.error(f"Erro ao buscar questões para o ano {year}: {e}")
+        return None
+
+def format_duration(seconds):
+    if seconds is None: return "N/A"
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+# --- 6. Rotas de Autenticação ---
 @app.route("/")
 def index():
     user = session.get('user')
     return render_template('index.html', user=user)
 
-@app.route("/login/google/authorized")
-def authorized():
-    if not google.authorized:
-        flash("Autorização do Google falhou.")
-        return redirect(url_for("google.login"))
-    try:
-        resp = google.get("/oauth2/v2/userinfo")
-        resp.raise_for_status()
-        user_info = resp.json()
-
-        email = user_info['email']
-        name = user_info.get('name', email.split('@')[0])
-
-        conn = get_db_connection()
-        user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
-        
-        if not user:
-            conn.execute('INSERT INTO users (email, name, password) VALUES (?, ?, ?)',
-                        (email, name, 'OAUTH_GOOGLE_PLACEHOLDER'))
-            conn.commit()
-        conn.close()
-
-        session['user'] = {
-            'email': email,
-            'name': name
-        }
-        flash("Login com Google realizado com sucesso!")
-        return redirect(url_for("index"))
-    except requests.exceptions.RequestException as e:
-        flash(f"Erro ao obter informações do Google: {e}")
-        return redirect(url_for("login"))
-    except Exception as e:
-        flash(f"Erro inesperado no login com Google: {e}")
-        return redirect(url_for("login"))
+@app.route("/login")
+def login():
+    if 'user' in session:
+        return redirect(url_for('index'))
+    return render_template('login.html')
 
 @app.route('/login/email', methods=['POST'])
 def login_email():
@@ -165,13 +163,11 @@ def login_email():
     user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
     conn.close()
     
-    # Lógica aprimorada para feedback específico
     if not user:
-        flash('Usuário não cadastrado.') # Mensagem específica
+        flash('Usuário não cadastrado.', 'error')
     elif not check_password_hash(user['password'], password):
-        flash('Senha Incorreta!', 'success')
+        flash('Senha Incorreta!', 'error')
     else:
-        # Se usuário existe e a senha está correta
         session['user'] = {
             'email': user['email'],
             'name': user['name'] or user['email'].split('@')[0]
@@ -179,7 +175,6 @@ def login_email():
         flash('Login Efetuado com Sucesso.', 'success')
         return redirect(url_for('index'))
     
-    # Se chegou aqui, é porque deu algum erro, então redireciona de volta para o login
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['POST'])
@@ -192,7 +187,6 @@ def register():
     hashed_password = generate_password_hash(password)
     
     try:
-        # Usamos g.db que foi criado pelo decorator
         cursor = g.db.execute('SELECT 1 FROM users WHERE email = ?', (email,))
         if cursor.fetchone():
             flash('Este email já está cadastrado. Por favor, tente fazer o login.', 'error')
@@ -212,23 +206,26 @@ def register():
         flash(f'Ocorreu um erro inesperado: {str(e)}', 'error')
         return redirect(url_for('login'))
 
-@app.route("/login")
-def login():
-    if 'user' in session:
-        return redirect(url_for('index'))
-    return render_template('login.html')
-
 @app.route("/logout")
 def logout():
     session.pop('user', None)
-    flash('Você foi desconectado com sucesso.', 'success') # Adicionando categoria de sucesso
+    flash('Você foi desconectado com sucesso.', 'success')
     return redirect(url_for('index'))
 
+@app.route('/reportar-bug')
+def reportar_bug_page():
+    # Passamos o 'user' para que o campo de email possa ser preenchido automaticamente se o usuário estiver logado
+    return render_template('reportar_bug.html', user=session.get('user'))
+
+@app.route('/obrigado')
+def obrigado_page():
+    # Esta rota apenas mostra a página de agradecimento
+    return render_template('obrigado.html', user=session.get('user'))
+
+# --- 7. Rotas de Simulados ---
 @app.route('/exame')
+@login_required
 def exame():
-    if 'user' not in session:
-        flash('Você precisa estar logado para acessar os simulados.')
-        return redirect(url_for('login'))
     user = session.get('user')
     return render_template('exame.html', user=user)
 
@@ -239,13 +236,10 @@ def get_provas():
         response.raise_for_status()
         return jsonify(response.json())
     except requests.exceptions.RequestException as req_e:
-        print(f"Erro na requisição para API ENEM (provas): {req_e}")
+        app.logger.error(f"Erro na requisição para API ENEM (provas): {req_e}")
         return jsonify({'error': f"Erro de rede ou API externa: {req_e}"}), 500
-    except ValueError as val_e:
-        print(f"Erro ao decodificar JSON da API ENEM (provas): {val_e}")
-        return jsonify({'error': f"Resposta inválida da API externa: {val_e}"}), 500
     except Exception as e:
-        print(f"Erro inesperado em get_provas: {e}")
+        app.logger.error(f"Erro inesperado em get_provas: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/provas/<year>/questoes')
@@ -255,20 +249,15 @@ def get_questoes(year):
         response.raise_for_status()
         return jsonify(response.json())
     except requests.exceptions.RequestException as req_e:
-        print(f"Erro na requisição para API ENEM (questoes): {req_e}")
+        app.logger.error(f"Erro na requisição para API ENEM (questoes): {req_e}")
         return jsonify({'error': f"Erro de rede ou API externa: {req_e}"}), 500
-    except ValueError as val_e:
-        print(f"Erro ao decodificar JSON da API ENEM (questoes): {val_e}")
-        return jsonify({'error': f"Resposta inválida da API externa: {val_e}"}), 500
     except Exception as e:
-        print(f"Erro inesperado em get_questoes: {e}")
+        app.logger.error(f"Erro inesperado em get_questoes: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/submit', methods=['POST'])
+@login_required
 def submit_answers():
-    if 'user' not in session:
-        return jsonify({'error': 'Não autenticado'}), 401
-
     data = request.json
     year = data.get('year')
     user_respostas = data.get('respostas', {})
@@ -296,353 +285,369 @@ def submit_answers():
         conn.commit()
         conn.close()
         
-        flash('Respostas enviadas com sucesso! Veja seu resultado.')
         return jsonify({'success': True, 'redirect_url': url_for('resultado_detalhe', simulado_id=simulado_id)})
     except Exception as e:
-        print(f"Erro ao salvar respostas: {e}")
-        flash(f'Erro ao salvar respostas: {e}')
+        app.logger.error(f"Erro ao salvar respostas: {e}")
         return jsonify({'error': str(e)}), 500
 
+# --- 8. Rotas de Resultados e Histórico ---
 @app.route('/historico')
+@login_required
 def historico():
-    if 'user' not in session:
-        flash('Você precisa estar logado para acessar seu histórico.')
-        return redirect(url_for('login'))
-    user = session.get('user')
-    return render_template('historico.html', user=user)
+    return render_template('historico.html', user=session.get('user'))
 
-# API para obter o histórico de simulados do usuário COM PONTUAÇÃO
 @app.route('/api/historico')
+@login_required
 def get_historico():
-    if 'user' not in session:
-        return jsonify({'error': 'Não autenticado'}), 401
-
     user_email = session['user']['email']
     conn = get_db_connection()
-    simulados_feitos = conn.execute(
-        'SELECT id, prova_year, duracao_segundos, timestamp FROM simulados WHERE user_email = ? ORDER BY timestamp DESC',
-        (user_email,)
-    ).fetchall()
-    conn.close()
+    historico_data = {'simulados': [], 'redacoes': []}
 
-    historico_data = []
-    for s in simulados_feitos:
-        # Calcular acertos para cada simulado
-        simulado_id = s['id']
-        prova_year = s['prova_year']
-        
-        conn_inner = get_db_connection() # Nova conexão para evitar conflitos
-        user_respostas_db = conn_inner.execute(
-            'SELECT question_unique_id, user_answer FROM respostas_simulado WHERE simulado_id = ?',
-            (simulado_id,)
+    try:
+        simulados_db = conn.execute(
+            'SELECT id, prova_year, duracao_segundos, timestamp FROM simulados WHERE user_email = ? ORDER BY timestamp DESC', 
+            (user_email,)
         ).fetchall()
-        conn_inner.close()
 
-        user_respostas = {r['question_unique_id']: r['user_answer'] for r in user_respostas_db}
+        for s in simulados_db:
+            respostas_db = conn.execute(
+                'SELECT question_unique_id, user_answer FROM respostas_simulado WHERE simulado_id = ?', 
+                (s['id'],)
+            ).fetchall()
+            
+            user_respostas = {r['question_unique_id']: r['user_answer'] for r in respostas_db}
+            total_respondidas = len(user_respostas)
+            acertos = 0
+            
+            if total_respondidas > 0:
+                questoes_api = get_questions_from_api_with_cache(s['prova_year'])
+                if questoes_api:
+                    for q_api in questoes_api:
+                        if q_api.get('title') in user_respostas and user_respostas[q_api.get('title')] == q_api.get('correctAlternative'):
+                            acertos += 1
+            
+            timestamp_obj = datetime.strptime(s['timestamp'].split('.')[0], '%Y-%m-%d %H:%M:%S')
+            
+            historico_data['simulados'].append({
+                'id': s['id'], 
+                'prova_year': s['prova_year'],
+                'timestamp': timestamp_obj.strftime('%d/%m/%Y %H:%M'),
+                'duracao_formatada': format_duration(s['duracao_segundos']),
+                'acertos': acertos, 
+                'total_questoes_respondidas': total_respondidas
+            })
+
+        redacoes_db = conn.execute(
+            'SELECT id, tema, timestamp FROM redacoes WHERE user_email = ? ORDER BY timestamp DESC', 
+            (user_email,)
+        ).fetchall()
         
-        acertos_totais = 0
-        total_questoes_respondidas = len(user_respostas)
-
-        if total_questoes_respondidas > 0:
-            try:
-                # Buscar o gabarito para este ano da prova
-                response_api = requests.get(f'{ENEM_API_BASE_URL}/exams/{prova_year}/questions')
-                response_api.raise_for_status()
-                questoes_api = response_api.json().get('questions', [])
-
-                for q_api in questoes_api:
-                    q_unique_id = q_api.get('title') # Ou q_api.get('id') se usado no frontend
-                    if not q_unique_id:
-                         q_unique_id = f"questao-{q_api.get('year', '')}-{q_api.get('index', '')}"
-
-                    if q_unique_id in user_respostas:
-                        user_resp = user_respostas[q_unique_id]
-                        gabarito_resp = q_api.get('correctAlternative') # CORREÇÃO: Usar 'correctAlternative'
-
-                        if user_resp == gabarito_resp and user_resp is not None:
-                            acertos_totais += 1
-            except requests.exceptions.RequestException as e:
-                print(f"Erro ao buscar gabarito para simulado {simulado_id} no histórico: {e}")
-                acertos_totais = "Erro" # Indicar erro se não conseguir o gabarito
-                total_questoes_respondidas = "Erro"
-            except Exception as e:
-                print(f"Erro inesperado ao processar simulado {simulado_id} no histórico: {e}")
-                acertos_totais = "Erro"
-                total_questoes_respondidas = "Erro"
-        else:
-            acertos_totais = 0
-            total_questoes_respondidas = 0
-
-        # Formata a duração para ser mais legível
-        duracao_formatada = ""
-        if s['duracao_segundos'] is not None:
-            horas = s['duracao_segundos'] // 3600
-            minutos = (s['duracao_segundos'] % 3600) // 60
-            segundos = s['duracao_segundos'] % 60
-            if horas > 0:
-                duracao_formatada += f"{horas}h "
-            if minutos > 0:
-                duracao_formatada += f"{minutos}m "
-            if segundos > 0 or (horas == 0 and minutos == 0):
-                duracao_formatada += f"{segundos}s"
-            duracao_formatada = duracao_formatada.strip()
-
-        historico_data.append({
-            'id': s['id'],
-            'prova_year': s['prova_year'],
-            'timestamp': datetime.strptime(s['timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y %H:%M'),
-            'duracao_formatada': duracao_formatada,
-            'acertos': acertos_totais, # Adicionado
-            'total_questoes_respondidas': total_questoes_respondidas # Adicionado
-        })
-    
+        for r in redacoes_db:
+            timestamp_obj = datetime.strptime(r['timestamp'].split('.')[0], '%Y-%m-%d %H:%M:%S')
+            historico_data['redacoes'].append({
+                'id': r['id'], 
+                'tema': r['tema'],
+                'timestamp': timestamp_obj.strftime('%d/%m/%Y')
+            })
+            
+    finally:
+        if conn: conn.close()
+            
     return jsonify(historico_data)
 
-
-# Rota para a página de detalhes de um simulado específico
 @app.route('/resultado/<int:simulado_id>')
+@login_required
 def resultado_detalhe(simulado_id):
-    if 'user' not in session:
-        flash('Você precisa estar logado para ver os resultados.')
-        return redirect(url_for('login'))
-    user = session.get('user')
-    return render_template('resultado.html', user=user, simulado_id=simulado_id)
+    return render_template('resultado.html', user=session.get('user'), simulado_id=simulado_id)
 
-
-# API para obter o resultado detalhado de um simulado específico
 @app.route('/api/resultado/<int:simulado_id>')
+@login_required
 def get_resultado_detalhado(simulado_id):
-    if 'user' not in session:
-        return jsonify({'error': 'Não autenticado'}), 401
-
     user_email = session['user']['email']
     conn = get_db_connection()
 
+    # 1. Verifica se o simulado pertence ao usuário logado
     simulado = conn.execute(
-        'SELECT id, user_email, prova_year, duracao_segundos, timestamp FROM simulados WHERE id = ? AND user_email = ?',
+        'SELECT * FROM simulados WHERE id = ? AND user_email = ?',
         (simulado_id, user_email)
     ).fetchone()
 
     if not simulado:
-        conn.close()
         return jsonify({'error': 'Simulado não encontrado ou não pertence a este usuário.'}), 404
 
-    prova_year = simulado['prova_year']
-    
-    user_respostas_db = conn.execute(
+    # 2. Pega as respostas do usuário para este simulado
+    respostas_db = conn.execute(
         'SELECT question_unique_id, user_answer FROM respostas_simulado WHERE simulado_id = ?',
         (simulado_id,)
     ).fetchall()
-    conn.close()
-
-    user_respostas = {r['question_unique_id']: r['user_answer'] for r in user_respostas_db}
-
-    try:
-        response = requests.get(f'{ENEM_API_BASE_URL}/exams/{prova_year}/questions')
-        response.raise_for_status()
-        questoes_api = response.json()
-    except requests.exceptions.RequestException as req_e:
-        print(f"Erro ao buscar questões/gabarito da API ENEM: {req_e}")
-        return jsonify({'error': f"Não foi possível obter gabarito da prova {prova_year}: {req_e}"}), 500
-    except Exception as e:
-        print(f"Erro inesperado ao obter gabarito: {e}")
-        return jsonify({'error': str(e)}), 500
-
-    todas_questoes_da_prova = questoes_api.get('questions', [])
+    user_respostas = {r['question_unique_id']: r['user_answer'] for r in respostas_db}
     
+    # 3. Usa a função de cache para buscar o gabarito completo da prova na API externa
+    prova_year = simulado['prova_year']
+    todas_questoes_da_prova = get_questions_from_api_with_cache(prova_year)
+
+    if not todas_questoes_da_prova:
+        return jsonify({'error': f'Não foi possível obter o gabarito para a prova de {prova_year}.'}), 500
+
+    # 4. Compara as respostas do usuário com o gabarito
     acertos_totais = 0
-    total_questoes_para_calculo = len(user_respostas) # Usa o número de questões que o usuário respondeu
-
     respostas_detalhadas = []
-    acertos_por_disciplina = {}
-    total_por_disciplina = {}
 
-    for q in todas_questoes_da_prova:
-        q_unique_id = q.get('title')
-        if not q_unique_id:
-            q_unique_id = f"questao-{q.get('year', '')}-{q.get('index', '')}"
+    # Itera sobre a lista de questões que o usuário respondeu
+    for q_unique_id, user_answer in user_respostas.items():
+        # Encontra a questão correspondente na lista completa da API
+        q_api = next((q for q in todas_questoes_da_prova if q.get('title') == q_unique_id), None)
         
-        # Só processa se a questão foi respondida pelo usuário
-        if q_unique_id in user_respostas:
-            user_resp = user_respostas.get(q_unique_id)
-            # CORREÇÃO AQUI: Usar 'correctAlternative' da API para o gabarito
-            gabarito_resp = q.get('correctAlternative') 
-
-            acertou = (user_resp == gabarito_resp and user_resp is not None)
-
+        if q_api:
+            acertou = (user_answer == q_api.get('correctAlternative'))
             if acertou:
                 acertos_totais += 1
-
-            disciplina = q.get('discipline', 'Outros')
-            acertos_por_disciplina[disciplina] = acertos_por_disciplina.get(disciplina, 0) + (1 if acertou else 0)
-            total_por_disciplina[disciplina] = total_por_disciplina.get(disciplina, 0) + 1
-
+            
             respostas_detalhadas.append({
-                'question_number': q.get('index'),
-                'question_title': q.get('title'),
-                'discipline': disciplina,
-                'user_answer': user_resp,
-                'correct_answer': gabarito_resp,
-                'alternatives': q.get('alternatives'),
-                'question_context': q.get('context'),
-                'alternatives_introduction': q.get('alternativesIntroduction'),
+                'question_number': q_api.get('index'),
+                'question_context': q_api.get('context'),
+                'alternativesIntroduction': q_api.get('alternativesIntroduction'),
+                'files': q_api.get('files'),
+                'alternatives': q_api.get('alternatives'),
+                'discipline': q_api.get('discipline'),
+                'user_answer': user_answer,
+                'correct_answer': q_api.get('correctAlternative'),
                 'acertou': acertou
             })
-    
-    porcentagem_total = (acertos_totais / total_questoes_para_calculo) * 100 if total_questoes_para_calculo > 0 else 0
 
-    porcentagem_por_disciplina = {}
-    for disc, total in total_por_disciplina.items():
-        acertos_disc = acertos_por_disciplina.get(disc, 0)
-        porcentagem_por_disciplina[disc] = (acertos_disc / total) * 100 if total > 0 else 0
+    total_questoes_respondidas = len(user_respostas)
+    porcentagem_total = (acertos_totais / total_questoes_respondidas) * 100 if total_questoes_respondidas > 0 else 0
 
+    # 5. Retorna todos os dados para o front-end
     return jsonify({
-        'simulado_id': simulado['id'],
         'prova_year': simulado['prova_year'],
-        'timestamp': datetime.strptime(simulado['timestamp'], '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y %H:%M'),
+        'timestamp': datetime.strptime(simulado['timestamp'].split('.')[0], '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y %H:%M'),
         'duracao_segundos': simulado['duracao_segundos'],
         'acertos_totais': acertos_totais,
-        'total_questoes': total_questoes_para_calculo,
+        'total_questoes': total_questoes_respondidas,
         'porcentagem_total': round(porcentagem_total, 2),
-        'acertos_por_disciplina': acertos_por_disciplina,
-        'total_por_disciplina': total_por_disciplina,
-        'porcentagem_por_disciplina': {k: round(v, 2) for k, v in porcentagem_por_disciplina.items()},
-        'respostas_detalhadas': respostas_detalhadas
+        'respostas_detalhadas': sorted(respostas_detalhadas, key=lambda x: x['question_number'])
     })
 
-# Adicione esta nova rota no app.py (antes do if __name__ == '__main__')
-@app.route('/api/ranking_geral')
-def get_ranking_geral():
+# --- 9. Rotas de Redação ---
+@app.route('/redacao')
+@login_required
+def redacao_page():
+    return render_template('redacao.html', user=session.get('user'))
+
+@app.route('/api/salvar_redacao', methods=['POST'])
+@login_required
+def salvar_redacao():
+    data = request.get_json()
+    tema = data.get('tema')
+    texto_redacao = data.get('texto_redacao')
+    user_email = session['user']['email']
+
+    if not tema or not texto_redacao or len(texto_redacao) < 100:
+        return jsonify({'error': 'Tema e texto da redação (mínimo 100 caracteres) são obrigatórios.'}), 400
+
+    conn = None
     try:
         conn = get_db_connection()
-
-        # Pega todos os simulados
-        simulados = conn.execute('SELECT * FROM simulados').fetchall()
-        usuarios = conn.execute('SELECT email, name FROM users').fetchall()
-        conn.close()
-
-        # Indexa os usuários por email
-        usuarios_dict = {u['email']: u['name'] for u in usuarios}
-
-        ranking_temp = {}  # Agrupar por email
-
-        for s in simulados:
-            user_email = s['user_email']
-            prova_year = s['prova_year']
-            duracao = s['duracao_segundos'] or 0
-
-            # Coletar respostas
-            conn = get_db_connection()
-            respostas = conn.execute(
-                'SELECT question_unique_id, user_answer FROM respostas_simulado WHERE simulado_id = ?',
-                (s['id'],)
-            ).fetchall()
+        conn.execute(
+            'INSERT INTO redacoes (user_email, tema, texto_redacao) VALUES (?, ?, ?)',
+            (user_email, tema, texto_redacao)
+        )
+        conn.commit()
+        return jsonify({'success': True, 'message': 'Redação salva com sucesso!'})
+    except Exception as e:
+        app.logger.error(f"Erro ao salvar redação: {e}")
+        return jsonify({'error': 'Ocorreu um erro ao salvar a redação.'}), 500
+    finally:
+        if conn:
             conn.close()
 
-            if not respostas:
+@app.route('/redacao/<int:redacao_id>')
+@login_required
+def ver_redacao(redacao_id):
+    conn = get_db_connection()
+    redacao_db = conn.execute(
+        'SELECT * FROM redacoes WHERE id = ? AND user_email = ?',
+        (redacao_id, session['user']['email'])
+    ).fetchone()
+    conn.close()
+
+    if not redacao_db:
+        flash('Redação não encontrada ou não pertence a este usuário.', 'danger')
+        return redirect(url_for('historico'))
+    
+    redacao = dict(redacao_db)
+    timestamp_obj = datetime.strptime(redacao['timestamp'].split('.')[0], '%Y-%m-%d %H:%M:%S')
+    redacao['timestamp_formatado'] = timestamp_obj.strftime('%d/%m/%Y às %H:%M')
+    
+    return render_template('ver_redacao.html', user=session.get('user'), redacao=redacao)
+
+@app.route('/api/corrigir_redacao/<int:redacao_id>', methods=['POST'])
+@login_required
+def corrigir_redacao(redacao_id):
+    conn = get_db_connection()
+    redacao = conn.execute(
+        'SELECT * FROM redacoes WHERE id = ? AND user_email = ?',
+        (redacao_id, session['user']['email'])
+    ).fetchone()
+
+    if not redacao:
+        conn.close()
+        return jsonify({'error': 'Redação não encontrada.'}), 404
+
+    if redacao['feedback']:
+        conn.close()
+        return jsonify({
+            'nota_total': redacao['nota_total'],
+            'notas': [redacao['nota_c1'], redacao['nota_c2'], redacao['nota_c3'], redacao['nota_c4'], redacao['nota_c5']],
+            'feedback': redacao['feedback']
+        })
+
+    texto_redacao = redacao['texto_redacao']
+
+    prompt = f"""
+    Aja como um corretor experiente do ENEM. Avalie a seguinte redação com base nas 5 competências do ENEM.
+    Para cada competência, atribua uma nota de 0 a 200, em múltiplos de 40.
+    A nota total deve ser a soma das 5 competências.
+    Forneça um feedback geral construtivo sobre o texto, destacando pontos fortes e áreas para melhoria.
+    O formato da sua resposta DEVE ser um objeto JSON válido, sem nenhum texto antes ou depois, com a seguinte estrutura:
+    {{
+    "nota_c1": <nota>,
+    "nota_c2": <nota>,
+    "nota_c3": <nota>,
+    "nota_c4": <nota>,
+    "nota_c5": <nota>,
+    "nota_total": <nota_total>,
+    "feedback": "<seu feedback em texto aqui>"
+    }}
+
+    REDAÇÃO PARA AVALIAR:
+    ---
+    {texto_redacao}
+    ---
+    """
+
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        response = model.generate_content(prompt)
+        
+        clean_response = response.text.replace('```json', '').replace('```', '').strip()
+        correcao = json.loads(clean_response)
+
+        conn.execute(
+            '''UPDATE redacoes SET 
+            nota_c1 = ?, nota_c2 = ?, nota_c3 = ?, nota_c4 = ?, nota_c5 = ?, nota_total = ?, feedback = ?
+            WHERE id = ?''',
+            (correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], correcao['nota_c4'], correcao['nota_c5'], correcao['nota_total'], correcao['feedback'], redacao_id)
+        )
+        conn.commit()
+        conn.close()
+        
+        resposta_final = {
+            'nota_total': correcao['nota_total'],
+            'notas': [correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], correcao['nota_c4'], correcao['nota_c5']],
+            'feedback': correcao['feedback']
+        }
+        return jsonify(resposta_final)
+
+    except Exception as e:
+        conn.close()
+        app.logger.error(f"Erro na API do Gemini ou ao processar a resposta: {e}")
+        return jsonify({'error': 'Não foi possível obter a correção da IA no momento.'}), 500
+
+# --- 10. Rotas de Ranking ---
+@app.route('/ranking')
+def ranking_page():
+    return render_template('ranking.html', user=session.get('user'))
+
+@app.route('/api/ranking_geral')
+def get_ranking_geral():
+    conn = get_db_connection()
+    try:
+        # Pega todos os dados necessários do banco de uma vez
+        simulados = conn.execute('SELECT * FROM simulados').fetchall()
+        usuarios = conn.execute('SELECT email, name FROM users').fetchall()
+        respostas = conn.execute('SELECT * FROM respostas_simulado').fetchall()
+
+        usuarios_dict = {u['email']: u['name'] for u in usuarios}
+        respostas_por_simulado = {}
+        for r in respostas:
+            if r['simulado_id'] not in respostas_por_simulado:
+                respostas_por_simulado[r['simulado_id']] = {}
+            respostas_por_simulado[r['simulado_id']][r['question_unique_id']] = r['user_answer']
+
+        ranking_temp = {}
+        for s in simulados:
+            user_email = s['user_email']
+            user_respostas = respostas_por_simulado.get(s['id'], {})
+            total_respondidas = len(user_respostas)
+
+            if total_respondidas == 0:
                 continue
-
-            user_respostas = {r['question_unique_id']: r['user_answer'] for r in respostas}
-
-            # Chamar API para obter gabarito
-            try:
-                r = requests.get(f'{ENEM_API_BASE_URL}/exams/{prova_year}/questions')
-                r.raise_for_status()
-                questoes = r.json().get('questions', [])
-            except:
-                continue  # Ignora se API falhar
 
             acertos = 0
-            total = 0
-
-            for q in questoes:
-                qid = q.get('title') or f"questao-{q.get('year')}-{q.get('index')}"
-                if qid in user_respostas:
-                    total += 1
-                    if user_respostas[qid] == q.get('correctAlternative'):
+            questoes_api = get_questions_from_api_with_cache(s['prova_year'])
+            if questoes_api:
+                for q_api in questoes_api:
+                    # CORREÇÃO PRINCIPAL: Usa o título para comparar, como no resto do app
+                    q_unique_id = q_api.get('title')
+                    if q_unique_id in user_respostas and user_respostas[q_unique_id] == q_api.get('correctAlternative'):
                         acertos += 1
-
-            if total == 0:
-                continue
-
+            
             if user_email not in ranking_temp:
                 ranking_temp[user_email] = {
                     'name': usuarios_dict.get(user_email, user_email),
-                    'acertos_totais': 0,
-                    'total_questoes': 0,
-                    'duracoes': []
+                    'acertos_totais': 0, 'total_questoes': 0, 'duracoes': []
                 }
-
+            
             ranking_temp[user_email]['acertos_totais'] += acertos
-            ranking_temp[user_email]['total_questoes'] += total
-            ranking_temp[user_email]['duracoes'].append(duracao)
+            ranking_temp[user_email]['total_questoes'] += total_respondidas
+            if s['duracao_segundos']:
+                ranking_temp[user_email]['duracoes'].append(s['duracao_segundos'])
 
-        # Agora gerar a lista
         ranking = []
         for user_email, dados in ranking_temp.items():
-            total_acertos = dados['acertos_totais']
-            total_q = dados['total_questoes']
-            media_duracao = sum(dados['duracoes']) // len(dados['duracoes']) if dados['duracoes'] else 0
-
-            horas = media_duracao // 3600
-            minutos = (media_duracao % 3600) // 60
-            segundos = media_duracao % 60
-            duracao_formatada = f"{horas:02}:{minutos:02}:{segundos:02}"
-
-            ranking.append({
-                'name': dados['name'],
-                'porcentagem': round((total_acertos / total_q) * 100, 2),
-                'duracao_formatada': duracao_formatada,
-                'acertos': total_acertos,
-                'total_questoes': total_q
-            })
-
-        # Ordenar por desempenho
+            if dados['total_questoes'] > 0:
+                media_duracao = sum(dados['duracoes']) // len(dados['duracoes']) if dados['duracoes'] else 0
+                ranking.append({
+                    'name': dados['name'],
+                    'porcentagem': round((dados['acertos_totais'] / dados['total_questoes']) * 100, 2),
+                    'duracao_formatada': format_duration(media_duracao),
+                    'acertos': dados['acertos_totais'],
+                    'total_questoes': dados['total_questoes']
+                })
+        
         ranking.sort(key=lambda x: (-x['porcentagem'], x['duracao_formatada']))
-
-        return jsonify(ranking[:50])  # top 50
+        return jsonify(ranking[:50])
 
     except Exception as e:
-        print(f"Erro ao gerar ranking: {e}")
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Erro ao gerar ranking: {e}")
+        return jsonify({'error': 'Falha ao gerar o ranking.'}), 500
 
-@app.route('/ranking')
-def ranking_page():
-    user = session.get('user')
-    return render_template('ranking.html', user=user)
-
-# Rota de Admin para visualizar o banco de dados
-# O 'secret_key' na URL é uma forma simples de proteger a página
+# --- 11. Rotas de Administração ---
 @app.route('/admin/view_db/<secret_key>')
 def view_db(secret_key):
-    # Pega a chave secreta que você vai configurar no Render
     admin_secret = os.getenv('ADMIN_SECRET_KEY')
     
-    # Se a chave não existir ou for diferente, nega o acesso
     if not admin_secret or secret_key != admin_secret:
         return "Acesso não autorizado.", 403
 
     try:
         conn = get_db_connection()
-        
-        # Pega o nome de todas as tabelas no banco de dados
         tables_cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [table['name'] for table in tables_cursor.fetchall()]
         
-        # Pega os dados de cada tabela
         db_data = {}
         for table_name in tables:
-            # Evita que a tabela de sessões seja exibida se existir
             if table_name != 'sessions':
                 data_cursor = conn.execute(f"SELECT * FROM {table_name}")
                 db_data[table_name] = data_cursor.fetchall()
         
         conn.close()
-        
-        # Renderiza um novo template HTML com os dados
         return render_template('admin_view.html', db_data=db_data)
     except Exception as e:
         return f"Ocorreu um erro ao acessar o banco de dados: {e}"
 
+# --- 12. Execução da Aplicação ---
 if __name__ == '__main__':
     app.run(debug=True)

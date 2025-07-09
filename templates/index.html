@@ -8,6 +8,32 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
+<style>
+    .floating-btn {
+    position: fixed; /* Posição fixa na tela */
+    bottom: 2rem;    /* 2rem de distância da parte de baixo */
+    right: 2rem;     /* 2rem de distância da direita */
+    width: 60px;
+    height: 60px;
+    background-color: var(--color-primary);
+    color: var(--color-white);
+    border-radius: 50%; /* Deixa o botão redondo */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem; /* Tamanho do ícone */
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+    text-decoration: none;
+    z-index: 1000; /* Garante que ele fique sobre outros elementos */
+    transition: transform 0.3s ease, background-color 0.3s ease;
+}
+
+.floating-btn:hover {
+    transform: translateY(-5px) scale(1.05); /* Efeito de "subir" ao passar o mouse */
+    background-color: var(--color-primary-dark);
+    color: var(--color-white); /* Garante que o ícone permaneça branco */
+}
+</style>
 <body>
     <header class="main-header">
         <div class="container">
@@ -21,7 +47,8 @@
                 <div class="navbar-collapse">
                     <ul class="navbar-nav">
                         {% if user %}
-                        <li><a href="/exame" class="nav-link"><i class="fas fa-clipboard-list"></i> Simulados</a></li>
+                        <li><a href="/redacao" class="nav-link"><i class="fas fa-pen-nib"></i> Redação</a></li>
+                        <li><a href="/exame" class="nav-link"><i class="fas fa-file-alt"></i> Simulados</a></li>
                         <li><a href="/historico" class="nav-link"><i class="fas fa-history"></i> Meus Resultados</a></li>
                         <li><a href="/ranking" class="nav-link"><i class="fas fa-trophy"></i> Ranking</a></li>
                         <li><a href="/logout" class="nav-link"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
@@ -54,7 +81,8 @@
                     <h1 class="hero-title">Bem-vindo, {{ user.name }}!</h1>
                     <p class="hero-subtitle">Pronto para testar seus conhecimentos e alcançar a nota dos seus sonhos?</p>
                     <div class="hero-buttons">
-                        <a href="/exame" class="btn btn-light btn-lg"><i class="fas fa-play"></i> Iniciar Novo Simulado</a>
+                        <a href="/exame" class="btn btn-outline-light btn-lg"><i class="fas fa-stopwatch"></i> Iniciar Novo Simulado</a>
+                        <a href="/redacao" class="btn btn-outline-light btn-lg"><i class="fas fa-pencil-alt"></i> Praticar Redação</a>
                         <a href="/historico" class="btn btn-outline-light btn-lg"><i class="fas fa-chart-line"></i> Ver Meus Resultados</a>
                     </div>
                     {% else %}
@@ -95,10 +123,14 @@
                 </div>
             </div>
         </section>
+        <a href="{{ url_for('reportar_bug_page') }}" target="_blank" class="floating-btn" title="Reportar Bug">
+                <i class="fas fa-tools"></i>
+            </a>
     </main>
 
     <footer class="main-footer">
         <p>Desenvolvido por Rafael Mendes - RM Aprendizado</p>
+        <p><a href="{{ url_for('reportar_bug_page') }}" style="color: var(--color-text-muted); font-size: 0.9rem;">Reportar um Bug</a></p>
     </footer>
 
     <script>

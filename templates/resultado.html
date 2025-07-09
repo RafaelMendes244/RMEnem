@@ -3,11 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Resultado do Simulado - ERM ENEM Simulador</title>
+    <title>Resultado do Simulado - RM ENEM Simulador</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .detail-alternative.d-flex { display: flex; align-items: flex-start; gap: 0.5rem; }
+        .detail-alternative strong { margin-top: 2px; }
+        .img-fluid-alternative { max-width: 100%; height: auto; display: block; border-radius: var(--border-radius); margin-top: 0.5rem; }
+        .user-incorrect { border-color: var(--color-danger); background-color: #f8d7da; }
+        .correct-answer-highlight { border-color: var(--color-success); background-color: #d1e7dd; }
+        .gabarito-info { border-top: 1px solid #eee; padding-top: 1rem; margin-top: 1.5rem; font-weight: 600; color: var(--color-success); }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -18,7 +26,6 @@
                     {% if user %}
                     <span>Olá, <strong>{{ user.name }}</strong>!</span>
                     <a href="/" class="btn btn-sm btn-secondary"><i class="fas fa-home"></i> Início</a>
-                    <a href="/logout" class="btn btn-sm btn-danger"><i class="fas fa-sign-out-alt"></i> Sair</a>
                     {% endif %}
                 </div>
             </header>
@@ -30,35 +37,14 @@
                     <div class="card-header"><strong>Resumo do Desempenho</strong></div>
                     <div class="card-body">
                         <div class="resultado-summary">
-                            <div class="summary-item">
-                                <div class="summary-icon"><i class="fas fa-calendar-alt"></i></div>
-                                <div class="summary-text">
-                                    <small>Data</small>
-                                    <div class="summary-value" id="simulado-date">...</div>
-                                </div>
                             </div>
-                            <div class="summary-item">
-                                <div class="summary-icon"><i class="fas fa-stopwatch"></i></div>
-                                <div class="summary-text">
-                                    <small>Duração</small>
-                                    <div class="summary-value" id="simulado-duration">...</div>
-                                </div>
-                            </div>
-                            <div class="summary-item highlight">
-                                <div class="summary-icon"><i class="fas fa-check-circle"></i></div>
-                                <div class="summary-text">
-                                    <small>Acertos</small>
-                                    <div class="summary-value"><span id="total-acertos">...</span>/<span id="total-questoes"></span> (<span id="porcentagem-total"></span>%)</div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
                 <h3 class="mb-3"><i class="fas fa-list-ul"></i> Análise Detalhada das Questões</h3>
                 <div id="respostas-detalhadas-list">
                     <div class="spinner-wrapper">
-                        <i class="fas fa-spinner fa-2x"></i>
+                        <i class="fas fa-spinner fa-2x fa-spin"></i>
                         <p class="mt-3">Carregando detalhes das questões...</p>
                     </div>
                 </div>
@@ -76,6 +62,7 @@
             const simuladoId = {{ simulado_id | tojson }};
             const respostasDetalhadasList = document.getElementById('respostas-detalhadas-list');
             const resultadoTitle = document.getElementById('resultado-title');
+            const summaryContainer = document.querySelector('.resultado-summary');
 
             if (!simuladoId) {
                 resultadoTitle.textContent = 'Erro: ID do simulado não encontrado.';
@@ -85,46 +72,50 @@
             try {
                 const response = await fetch(`/api/resultado/${simuladoId}`);
                 const data = await response.json();
-
                 if (data.error) throw new Error(data.error);
 
                 resultadoTitle.textContent = `Resultado do Simulado ENEM ${data.prova_year}`;
-                document.getElementById('simulado-date').textContent = data.timestamp;
+                const duracaoFormatada = data.duracao_segundos ? `${Math.floor(data.duracao_segundos/3600).toString().padStart(2,'0')}:${Math.floor((data.duracao_segundos%3600)/60).toString().padStart(2,'0')}:${(data.duracao_segundos%60).toString().padStart(2,'0')}` : 'N/A';
+                summaryContainer.innerHTML = `
+                    <div class="summary-item"><div class="summary-icon"><i class="fas fa-calendar-alt"></i></div><div class="summary-text"><small>Data</small><div class="summary-value">${data.timestamp}</div></div></div>
+                    <div class="summary-item"><div class="summary-icon"><i class="fas fa-stopwatch"></i></div><div class="summary-text"><small>Duração</small><div class="summary-value">${duracaoFormatada}</div></div></div>
+                    <div class="summary-item highlight"><div class="summary-icon"><i class="fas fa-check-circle"></i></div><div class="summary-text"><small>Acertos</small><div class="summary-value"><span>${data.acertos_totais}</span>/<span>${data.total_questoes}</span> (<span>${data.porcentagem_total}</span>%)</div></div></div>
+                `;
                 
-                let duracaoFormatada = "N/A";
-                if (data.duracao_segundos !== null) {
-                    const h = Math.floor(data.duracao_segundos / 3600);
-                    const m = Math.floor((data.duracao_segundos % 3600) / 60);
-                    const s = data.duracao_segundos % 60;
-                    duracaoFormatada = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-                }
-                document.getElementById('simulado-duration').textContent = duracaoFormatada;
-
-                document.getElementById('total-acertos').textContent = data.acertos_totais;
-                document.getElementById('total-questoes').textContent = data.total_questoes;
-                document.getElementById('porcentagem-total').textContent = data.porcentagem_total;
-
                 respostasDetalhadasList.innerHTML = '';
                 if (data.respostas_detalhadas?.length > 0) {
                     data.respostas_detalhadas.forEach(q => {
                         const card = document.createElement('div');
                         card.className = `card question-detail-card ${q.acertou ? 'correct' : 'incorrect'}`;
                         const statusBadge = q.acertou ? `<span class="badge badge-success">Acertou</span>` : `<span class="badge badge-danger">Errou</span>`;
+                        
                         let alternativesHtml = '<div class="mt-3">';
-                        ['A', 'B', 'C', 'D', 'E'].forEach(letter => {
-                            const alt = q.alternatives?.find(a => a.letter === letter);
-                            if (alt) {
-                                let altClass = 'detail-alternative';
-                                if (q.user_answer === alt.letter) {
-                                    altClass += q.acertou ? ' user-correct' : ' user-incorrect';
-                                }
-                                if (alt.letter === q.correct_answer) {
-                                    altClass += ' correct-answer-highlight';
-                                }
-                                alternativesHtml += `<div class="${altClass}"><strong>${alt.letter})</strong> ${marked.parse(alt.text || '')}</div>`;
-                            }
+                        q.alternatives.forEach(alt => {
+                            let altClass = 'detail-alternative';
+                            if (q.user_answer === alt.letter && !q.acertou) altClass += ' user-incorrect';
+                            if (alt.letter === q.correct_answer) altClass += ' correct-answer-highlight';
+
+                            // --- CORREÇÃO DEFINITIVA APLICADA AQUI ---
+                            // Tratamos o texto como texto simples e a imagem como imagem, sem 'marked.parse'
+                            const textContent = alt.text || ''; 
+                            const fileContent = alt.file ? `<img src="${alt.file}" alt="Alternativa ${alt.letter}" class="img-fluid-alternative">` : '';
+
+                            alternativesHtml += `
+                                <div class="${altClass} d-flex">
+                                    <strong>${alt.letter})</strong>
+                                    <div>${textContent}${fileContent}</div>
+                                </div>`;
                         });
                         alternativesHtml += '</div>';
+
+                        let gabaritoHtml = '';
+                        if (!q.acertou) {
+                            gabaritoHtml = `<div class="gabarito-info"><strong>Resposta Correta: ${q.correct_answer}</strong></div>`;
+                        }
+
+                        const contextHtml = q.question_context ? marked.parse((q.question_context).replace(/!\[.*?\]\((.*?)\)/g, '<img src="$1" alt="Imagem da questão" class="img-fluid my-2">')) : '';
+                        const filesHtml = q.files && q.files.length > 0 ? q.files.map(f => `<img src="${f}" class="img-fluid my-2">`).join('') : '';
+                        const introHtml = q.alternativesIntroduction ? `<div class="mt-3">${marked.parse(q.alternativesIntroduction)}</div>` : '';
 
                         card.innerHTML = `
                             <div class="card-header d-flex justify-content-between align-items-center">
@@ -132,8 +123,11 @@
                                 ${statusBadge}
                             </div>
                             <div class="card-body">
-                                ${marked.parse(q.question_context || '')}
+                                ${contextHtml}
+                                ${filesHtml}
+                                ${introHtml}
                                 ${alternativesHtml}
+                                ${gabaritoHtml}
                             </div>`;
                         respostasDetalhadasList.appendChild(card);
                     });
@@ -143,7 +137,7 @@
 
             } catch (error) {
                 resultadoTitle.textContent = 'Não foi possível carregar o resultado.';
-                respostasDetalhadasList.innerHTML = `<div class="alert alert-danger">${error.message}</div>`;
+                respostasDetalhadasList.innerHTML = `<div class="alert alert-danger">Erro ao processar os detalhes do simulado: ${error.message}</div>`;
             }
         });
     </script>

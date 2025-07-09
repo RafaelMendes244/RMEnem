@@ -66,8 +66,6 @@
                         </div>
                         <button type="submit" class="btn btn-primary btn-block btn-lg">Entrar</button>
                     </form>
-                    <!-- <div class="divider">ou</div>
-                    <a href="{{ url_for('google.login') }}" class="btn btn-google btn-block"><i class="fab fa-google"></i> Entrar com Google</a> -->
                     <p class="text-center mt-4">Não tem uma conta? <a href="#" id="show-register">Cadastre-se</a></p>
                 </div>
 
@@ -124,6 +122,24 @@
             showRegisterLink.addEventListener('click', e => { e.preventDefault(); loginContainer.style.display = 'none'; registerContainer.style.display = 'block'; });
             hideRegisterLink.addEventListener('click', e => { e.preventDefault(); registerContainer.style.display = 'none'; loginContainer.style.display = 'block'; });
         });
+
+        // Sumir Mensagens de Alerta
+        const allAlerts = document.querySelectorAll('.alert');
+            allAlerts.forEach(alert => {
+                const timer = setTimeout(() => {
+                    alert.style.transition = 'opacity 0.5s ease';
+                    alert.style.opacity = '0';
+                    setTimeout(() => alert.remove(), 500);
+                }, 5000);
+
+                const closeButton = alert.querySelector('.close');
+                if (closeButton) {
+                    closeButton.addEventListener('click', () => {
+                        clearTimeout(timer);
+                        alert.remove();
+                    });
+                }
+            });
     </script>
 </body>
 </html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Praticar Redação - RM ENEM Simulador</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="main-content">
+            <header class="page-header">
+                <h1><i class="fas fa-pen-alt"></i> Praticar Redação</h1>
+                <div class="user-info">
+                    {% if user %}
+                    <span>Olá, <strong>{{ user.name }}</strong>!</span>
+                    <a href="/" class="btn btn-sm btn-secondary"><i class="fas fa-home"></i> Início</a>
+                    {% endif %}
+                </div>
+            </header>
+
+            <main>
+                <div class="card">
+                    <div class="card-body">
+                        <form id="redacao-form">
+                            <div class="form-group">
+                                <label for="tema-select" class="form-label">Escolha um Tema</label>
+                                <select id="tema-select" class="form-control">
+                                    <!-- Adicionando temas do ENEM 2009 a 2023 -->
+                                    <option value="O indivíduo frente à ética nacional: desafios para a formação de uma consciência crítica">ENEM 2009: O indivíduo frente à ética nacional: desafios para a formação de uma consciência crítica</option>
+                                    <option value="O trabalho e o exercício da cidadania no Brasil">ENEM 2010: O trabalho e o exercício da cidadania no Brasil</option>
+                                    <option value="O movimento imigratório para o Brasil no século XXI">ENEM 2011: O movimento imigratório para o Brasil no século XXI</option>
+                                    <option value="Os efeitos da implantação da internet nas relações sociais">ENEM 2012: Os efeitos da implantação da internet nas relações sociais</option>
+                                    <option value="Efeitos da expansão do acesso ao ensino superior no Brasil">ENEM 2013: Efeitos da expansão do acesso ao ensino superior no Brasil</option>
+                                    <option value="A violência contra a mulher na sociedade brasileira">ENEM 2014: A violência contra a mulher na sociedade brasileira</option>
+                                    <option value="Os desafios para a inclusão de pessoas com deficiência no Brasil">ENEM 2015: Os desafios para a inclusão de pessoas com deficiência no Brasil</option>
+                                    <option value="Caminhos para combater a intolerância religiosa no Brasil">ENEM 2016: Caminhos para combater a intolerância religiosa no Brasil</option>
+                                    <option value="Desafios para a formação educacional de surdos no Brasil">ENEM 2017: Desafios para a formação educacional de surdos no Brasil</option>
+                                    <option value="O impacto das novas tecnologias na educação">ENEM 2018: O impacto das novas tecnologias na educação</option>
+                                    <option value="Democratização do acesso ao cinema no Brasil">ENEM 2019: Democratização do acesso ao cinema no Brasil</option>
+                                    <option value="O estigma associado às doenças mentais na sociedade brasileira">ENEM 2020: O estigma associado às doenças mentais na sociedade brasileira</option>
+                                    <option value="Invisibilidade e registro civil: garantia de acesso à cidadania no Brasil">ENEM 2021: Invisibilidade e registro civil: garantia de acesso à cidadania no Brasil</option>
+                                    <option value="Desafios para a valorização de comunidades e povos tradicionais no Brasil">ENEM 2022: Desafios para a valorização de comunidades e povos tradicionais no Brasil</option>
+                                    <option value="O papel do Estado no enfrentamento da pobreza no Brasil">ENEM 2023: O papel do Estado no enfrentamento da pobreza no Brasil</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="redacao-textarea" class="form-label">Sua Redação</label>
+                                <textarea style="resize: none;" id="redacao-textarea" class="form-control" rows="20" placeholder="Comece a escrever sua redação aqui..."></textarea>
+                                <small class="text-muted">Dica: Escreva sua redação em um editor de texto e cole aqui para não perder seu progresso.</small>
+                            </div>
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary btn-lg btn-block">
+                                    <i class="fas fa-save"></i> Salvar Redação
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    <script src="/static/js/redacao.js"></script>
+</body>
+</html>

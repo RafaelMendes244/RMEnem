@@ -3,34 +3,543 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Visualização do Banco de Dados</title>
+    <title>Painel Admin | Gerenciamento de Banco de Dados</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primaria: #4361ee;
+            --primaria-escura: #3a56d4;
+            --secundaria: #3f37c9;
+            --sucesso: #4cc9f0;
+            --perigo: #f72585;
+            --alerta: #f8961e;
+            --info: #4895ef;
+            --branco: #ffffff;
+            --cinza-claro: #f8f9fa;
+            --cinza-medio: #e9ecef;
+            --cinza-escuro: #495057;
+            --preto: #212529;
+            --sombra: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --borda-raio: 8px;
+            --transicao: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--cinza-claro);
+            color: var(--preto);
+            line-height: 1.6;
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Barra Lateral */
+        .sidebar {
+            background-color: var(--preto);
+            color: var(--branco);
+            width: 280px;
+            padding: 20px 0;
+            position: fixed;
+            height: 100%;
+            transition: var(--transicao);
+            z-index: 1000;
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sidebar-header h2 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar-header h2 i {
+            color: var(--primaria);
+        }
+
+        .sidebar-menu {
+            padding: 20px;
+        }
+
+        .menu-categoria {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 20px 0 10px;
+        }
+
+        .sidebar-link {
+            display: flex;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            padding: 12px 15px;
+            border-radius: var(--borda-raio);
+            margin-bottom: 5px;
+            transition: var(--transicao);
+        }
+
+        .sidebar-link i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .sidebar-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: var(--branco);
+        }
+
+        .sidebar-link.ativo {
+            background-color: var(--primaria);
+            color: var(--branco);
+        }
+
+        /* Conteúdo Principal */
+        .main-content {
+            margin-left: 280px;
+            padding: 20px;
+            width: calc(100% - 280px);
+            transition: var(--transicao);
+        }
+
+        /* Cabeçalho */
+        .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--branco);
+            padding: 15px 25px;
+            border-radius: var(--borda-raio);
+            box-shadow: var(--sombra);
+            margin-bottom: 25px;
+        }
+
+        .topbar-titulo h1 {
+            font-size: 1.5rem;
+            color: var(--preto);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .topbar-acoes {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .botao {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 20px;
+            border-radius: var(--borda-raio);
+            font-weight: 500;
+            text-decoration: none;
+            transition: var(--transicao);
+            border: none;
+            cursor: pointer;
+            gap: 8px;
+        }
+
+        .botao-primario {
+            background-color: var(--primaria);
+            color: var(--branco);
+        }
+
+        .botao-primario:hover {
+            background-color: var(--primaria-escura);
+        }
+
+        .botao-secundario {
+            background-color: var(--cinza-medio);
+            color: var(--preto);
+        }
+
+        .botao-secundario:hover {
+            background-color: #d1d5db;
+        }
+
+        .botao-icone {
+            width: 40px;
+            height: 40px;
+            padding: 0;
+            border-radius: 50%;
+            background-color: var(--cinza-medio);
+            color: var(--cinza-escuro);
+        }
+
+        .botao-icone:hover {
+            background-color: #d1d5db;
+        }
+
+        /* Cartões */
+        .cartao {
+            background-color: var(--branco);
+            border-radius: var(--borda-raio);
+            box-shadow: var(--sombra);
+            margin-bottom: 25px;
+            overflow: hidden;
+        }
+
+        .cartao-cabecalho {
+            background-color: var(--branco);
+            padding: 20px;
+            border-bottom: 1px solid var(--cinza-medio);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cartao-cabecalho h3 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--preto);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .cartao-corpo {
+            padding: 20px;
+        }
+
+        /* Tabelas */
+        .tabela-container {
+            overflow-x: auto;
+            border-radius: var(--borda-raio);
+        }
+
+        .tabela {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        .tabela thead {
+            background-color: var(--cinza-medio);
+        }
+
+        .tabela th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--preto);
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+        }
+
+        .tabela td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--cinza-medio);
+            vertical-align: middle;
+        }
+
+        .tabela tr:last-child td {
+            border-bottom: none;
+        }
+
+        .tabela tr:hover td {
+            background-color: rgba(67, 97, 238, 0.05);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-sucesso {
+            background-color: rgba(76, 201, 240, 0.1);
+            color: var(--sucesso);
+        }
+
+        .badge-perigo {
+            background-color: rgba(247, 37, 133, 0.1);
+            color: var(--perigo);
+        }
+
+        .badge-alerta {
+            background-color: rgba(248, 150, 30, 0.1);
+            color: var(--alerta);
+        }
+
+        .badge-info {
+            background-color: rgba(72, 149, 239, 0.1);
+            color: var(--info);
+        }
+
+        /* Mensagens de status */
+        .sem-dados {
+            text-align: center;
+            padding: 40px;
+            color: var(--cinza-escuro);
+        }
+
+        /* Responsividade */
+        @media (max-width: 992px) {
+            .sidebar {
+                width: 250px;
+                transform: translateX(-250px);
+            }
+
+            .sidebar.ativo {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                width: 100%;
+            }
+
+            .menu-toggle {
+                display: block !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .topbar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 15px;
+                padding: 15px;
+            }
+
+            .topbar-acoes {
+                width: 100%;
+                justify-content: space-between;
+            }
+        }
+
+        /* Menu toggle para mobile */
+        .menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--preto);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-conteudo {
+            background-color: var(--branco);
+            border-radius: var(--borda-raio);
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-cabecalho {
+            padding: 20px;
+            border-bottom: 1px solid var(--cinza-medio);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-cabecalho h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .modal-fechar {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--cinza-escuro);
+        }
+
+        .modal-corpo {
+            padding: 20px;
+        }
+
+        .modal-rodape {
+            padding: 15px 20px;
+            border-top: 1px solid var(--cinza-medio);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Formulários */
+        .form-grupo {
+            margin-bottom: 20px;
+        }
+
+        .form-grupo label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--cinza-escuro);
+        }
+
+        .form-controle {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid var(--cinza-medio);
+            border-radius: var(--borda-raio);
+            font-size: 1rem;
+            transition: var(--transicao);
+        }
+
+        .form-controle:focus {
+            border-color: var(--primaria);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+        }
+
+        /* Animações */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <div class="main-content">
-            <header class="page-header">
-                <h1><i class="fas fa-database"></i> Painel de Administração</h1>
-                <a href="/" class="btn btn-sm btn-secondary"><i class="fas fa-home"></i> Voltar ao Início</a>
-            </header>
+        <!-- Barra Lateral -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-shield-alt"></i> Painel Admin</h2>
+            </div>
 
+            <div class="sidebar-menu">
+                <p class="menu-categoria">Navegação</p>
+                <a href="/" class="sidebar-link">
+                    <i class="fas fa-home"></i>
+                    <span>Início</span>
+                </a>
+
+                <p class="menu-categoria">Banco de Dados</p>
+                <a href="#" class="sidebar-link ativo">
+                    <i class="fas fa-database"></i>
+                    <span>Visão Geral</span>
+                </a>
+                <a href="#" class="sidebar-link">
+                    <i class="fas fa-table"></i>
+                    <span>Tabelas</span>
+                </a>
+                <a href="#" class="sidebar-link">
+                    <i class="fas fa-search"></i>
+                    <span>Consultas</span>
+                </a>
+
+                <p class="menu-categoria">Configurações</p>
+                <a href="#" class="sidebar-link">
+                    <i class="fas fa-user-cog"></i>
+                    <span>Usuários</span>
+                </a>
+                <a href="#" class="sidebar-link">
+                    <i class="fas fa-cog"></i>
+                    <span>Configurações</span>
+                </a>
+                <a href="#" class="sidebar-link">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Sair</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Conteúdo Principal -->
+        <div class="main-content" id="mainContent">
+            <!-- Topbar -->
+            <div class="topbar">
+                <div class="topbar-titulo">
+                    <button class="menu-toggle" id="menuToggle">
+                        <i class="fas fa-bars"></i>
+                    </button>
+                    <h1><i class="fas fa-database"></i> Visualização do Banco de Dados</h1>
+                </div>
+
+                <div class="topbar-acoes">
+                    <button class="botao botao-secundario">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Atualizar</span>
+                    </button>
+                    <button class="botao botao-primario" id="btnExportar">
+                        <i class="fas fa-file-export"></i>
+                        <span>Exportar</span>
+                    </button>
+                    <button class="botao-icone">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                    <button class="botao-icone">
+                        <i class="fas fa-user"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Conteúdo -->
             <main>
                 {% for table_name, rows in db_data.items() %}
-                    <div class="card">
-                        <div class="card-header">
-                            <h2 class="h5 mb-0"><i class="fas fa-table"></i> Tabela: {{ table_name }}</h2>
+                    <div class="cartao fade-in">
+                        <div class="cartao-cabecalho">
+                            <h3><i class="fas fa-table"></i> {{ table_name }}</h3>
+                            <div>
+                                <button class="botao botao-secundario btn-sm">
+                                    <i class="fas fa-edit"></i>
+                                    <span>Editar</span>
+                                </button>
+                                <button class="botao botao-secundario btn-sm">
+                                    <i class="fas fa-trash-alt"></i>
+                                    <span>Excluir</span>
+                                </button>
+                            </div>
                         </div>
-                        <div class="card-body">
+                        <div class="cartao-corpo">
                             {% if rows %}
-                                <div class="table-responsive">
-                                    <table class="table table-hover">
+                                <div class="tabela-container">
+                                    <table class="tabela">
                                         <thead>
                                             <tr>
                                                 {% for key in rows[0].keys() %}
                                                     <th>{{ key }}</th>
                                                 {% endfor %}
+                                                <th>Ações</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -39,25 +548,96 @@
                                                     {% for value in row %}
                                                         <td>{{ value }}</td>
                                                     {% endfor %}
+                                                    <td>
+                                                        <button class="botao-icone" title="Editar">
+                                                            <i class="fas fa-edit"></i>
+                                                        </button>
+                                                        <button class="botao-icone" title="Excluir">
+                                                            <i class="fas fa-trash-alt"></i>
+                                                        </button>
+                                                    </td>
                                                 </tr>
                                             {% endfor %}
                                         </tbody>
                                     </table>
                                 </div>
                             {% else %}
-                                <p class="text-center text-muted">A tabela "{{ table_name }}" está vazia.</p>
+                                <div class="sem-dados">
+                                    <i class="fas fa-database" style="font-size: 3rem; opacity: 0.3; margin-bottom: 15px;"></i>
+                                    <p>Nenhum dado encontrado nesta tabela.</p>
+                                </div>
                             {% endif %}
                         </div>
                     </div>
                 {% else %}
-                    <div class="card">
-                        <div class="card-body text-center">
-                            <p>Nenhuma tabela encontrada no banco de dados.</p>
+                    <div class="cartao">
+                        <div class="cartao-corpo">
+                            <div class="sem-dados">
+                                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: var(--alerta); margin-bottom: 15px;"></i>
+                                <p>Nenhuma tabela encontrada no banco de dados.</p>
+                                <button class="botao botao-primario mt-3">
+                                    <i class="fas fa-plus"></i>
+                                    <span>Criar Tabela</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 {% endfor %}
             </main>
         </div>
     </div>
+
+    <!-- Modal Exportar -->
+    <div class="modal" id="modalExportar">
+        <div class="modal-conteudo">
+            <div class="modal-cabecalho">
+                <h3><i class="fas fa-file-export"></i> Exportar Dados</h3>
+                <button class="modal-fechar" id="fecharModal">&times;</button>
+            </div>
+            <div class="modal-corpo">
+                <p>Selecione o formato para exportação dos dados:</p>
+                <div class="form-grupo">
+                    <select class="form-controle">
+                        <option value="csv">CSV (Excel)</option>
+                        <option value="json">JSON</option>
+                        <option value="sql">SQL</option>
+                        <option value="pdf">PDF</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-rodape">
+                <button class="botao botao-secundario" id="cancelarExportar">Cancelar</button>
+                <button class="botao botao-primario">Exportar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Menu toggle para mobile
+        document.getElementById('menuToggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('ativo');
+            document.getElementById('mainContent').classList.toggle('menu-aberto');
+        });
+
+        // Modal de exportação
+        document.getElementById('btnExportar').addEventListener('click', function() {
+            document.getElementById('modalExportar').style.display = 'flex';
+        });
+
+        document.getElementById('fecharModal').addEventListener('click', function() {
+            document.getElementById('modalExportar').style.display = 'none';
+        });
+
+        document.getElementById('cancelarExportar').addEventListener('click', function() {
+            document.getElementById('modalExportar').style.display = 'none';
+        });
+
+        // Fechar modal ao clicar fora
+        window.addEventListener('click', function(event) {
+            if (event.target === document.getElementById('modalExportar')) {
+                document.getElementById('modalExportar').style.display = 'none';
+            }
+        });
+    </script>
 </body>
 </html>
