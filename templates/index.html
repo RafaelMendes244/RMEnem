@@ -33,6 +33,26 @@
     background-color: var(--color-primary-dark);
     color: var(--color-white); /* Garante que o ícone permaneça branco */
 }
+
+.btn-apoie {
+    position: fixed;
+    left: 20px; /* distância da borda esquerda */
+    bottom: 20px; /* distância da parte inferior */
+    z-index: 1000;
+    background-color: #e91e63;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 50%;
+    text-align: center;
+    font-size: 20px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    transition: background-color 0.3s;
+}
+
+.btn-apoie:hover {
+    background-color: #c2185b;
+    color: white;
+}
 </style>
 <body>
     <header class="main-header">
@@ -54,7 +74,7 @@
                         <li><a href="/logout" class="nav-link"><i class="fas fa-sign-out-alt"></i> Sair</a></li>
                         {% else %}
                         <li><a href="/ranking" class="nav-link"><i class="fas fa-trophy"></i> Ranking</a></li>
-                        <li><a href="/login" class="btn btn-primary btn-sm"><i class="fas fa-sign-in-alt"></i> Entrar</a></li>
+                        <li><a href="/login" class="nav-link"><i class="fas fa-sign-in-alt"></i> Entrar</a></li>
                         {% endif %}
                     </ul>
                 </div>
@@ -124,8 +144,11 @@
             </div>
         </section>
         <a href="{{ url_for('reportar_bug_page') }}" target="_blank" class="floating-btn" title="Reportar Bug">
-                <i class="fas fa-tools"></i>
-            </a>
+            <i class="fas fa-tools"></i>
+        </a>
+        <a href="{{ url_for('apoie_page') }}" target="_blank" class="btn-apoie" title="Apoie o Projeto">
+            <i class="fas fa-heart"></i>
+        </a>
     </main>
 
     <footer class="main-footer">

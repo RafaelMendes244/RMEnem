@@ -5,3 +5,6 @@
 __pycache__/
 *.pyc
 venv/
+
+# Banco de Dados SQLite
+database.db
