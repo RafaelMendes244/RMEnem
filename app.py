@@ -222,6 +222,10 @@ def obrigado_page():
     # Esta rota apenas mostra a página de agradecimento
     return render_template('obrigado.html', user=session.get('user'))
 
+@app.route('/apoie')
+def apoie_page():
+    return render_template('apoie.html', user=session.get('user'))
+
 # --- 7. Rotas de Simulados ---
 @app.route('/exame')
 @login_required

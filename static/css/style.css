@@ -194,6 +194,8 @@ a:hover { color: var(--color-primary-dark); text-decoration: none; }
 .alternative:hover { border-color: var(--color-primary); background-color: var(--color-primary-light); }
 .alternative input[type="radio"] { margin-right: 1rem; }
 .alternative.selected { border-color: var(--color-primary); background-color: var(--color-primary-light); }
+.question-card .card-body img,
+.question-detail-card .card-body img { max-width: 100%; height: auto; display: block; /* Evita espaçamentos estranhos abaixo da imagem */ margin: 1rem auto; /* Centraliza e adiciona espaço vertical */ border-radius: var(--border-radius); }
 
 /* --- Resultado --- */
 .resultado-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; }

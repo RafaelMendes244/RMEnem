@@ -130,7 +130,11 @@
 
     <footer class="main-footer">
         <p>Desenvolvido por Rafael Mendes - RM Aprendizado</p>
-        <p><a href="{{ url_for('reportar_bug_page') }}" style="color: var(--color-text-muted); font-size: 0.9rem;">Reportar um Bug</a></p>
+        <div class="footer-links">
+            <a href="{{ url_for('reportar_bug_page') }}">Reportar um Bug</a>
+            <span>&middot;</span>
+            <a href="{{ url_for('apoie_page') }}">Apoie o Projeto</a>
+        </div>
     </footer>
 
     <script>
