@@ -542,3 +542,22 @@ body {
     border-radius: var(--border-radius);
     margin-top: 0.5rem; /* Adiciona um espaço se houver texto acima */
 }
+
+/* Estilos Adicionais Daqui para Baixo */
+/* Estilo para o Input Group do Pix Copia e Cola */
+.input-group {
+    display: flex;
+    position: relative;
+}
+.input-group .form-control {
+    /* Remove a borda arredondada da direita para colar no botão */
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+.input-group .btn {
+    /* Remove a borda arredondada da esquerda e ajusta a borda */
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border: 1px solid var(--color-border);
+    border-left: none; /* Evita borda dupla */
+}

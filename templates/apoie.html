@@ -28,11 +28,16 @@
                             <h3 class="h5">Faça uma doação com Pix</h3>
                             <p>Você pode usar o QR Code ou a chave "copia e cola".</p>
                             
-                            <img src="/static/images/seu-qrcode-pix.png" alt="QR Code Pix" style="max-width: 250px; margin: 1rem auto; display: block;">
+                            <img src="/static/images/qrcode-pix.png" alt="QR Code Pix" style="max-width: 250px; margin: 1rem auto; display: block;">
                             
                             <div class="form-group">
                                 <label for="pix-key" class="form-label">Chave Pix (Copia e Cola):</label>
-                                <input type="text" id="pix-key" class="form-control" value="00020126...SEU_CODIGO_PIX_AQUI...5303986" readonly>
+                                <div class="input-group">
+                                    <input type="text" id="pix-key" class="form-control" value="00020126580014BR.GOV.BCB.PIX0136d9e42a8e-7069-46cc-9a1a-0b593d23fbc05204000053039865802BR5925AngeloRafaelMendesBeze6009SAOPAULO62140510diYAG3FqGs6304F5F1" readonly>
+                                    <button type="button" id="copy-pix-btn" class="btn btn-secondary" title="Copiar Chave">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                </div>
                             </div>
                             <p class="mt-4"><strong>Sua ajuda é muito importante. Muito obrigado!</strong></p>
                         </div>
@@ -41,5 +46,35 @@
             </main>
         </div>
     </div>
+    <script>
+document.addEventListener('DOMContentLoaded', () => {
+    const copyButton = document.getElementById('copy-pix-btn');
+    const pixInput = document.getElementById('pix-key');
+
+    if (copyButton && pixInput) {
+        copyButton.addEventListener('click', () => {
+            const pixKey = pixInput.value;
+            
+            // Usa a API moderna e segura do navegador para copiar
+            navigator.clipboard.writeText(pixKey).then(() => {
+                // Sucesso! Mostra um feedback visual para o usuário.
+                const originalIcon = copyButton.innerHTML;
+                copyButton.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                copyButton.disabled = true;
+                
+                // Volta ao normal depois de 2 segundos
+                setTimeout(() => {
+                    copyButton.innerHTML = originalIcon;
+                    copyButton.disabled = false;
+                }, 2000);
+
+            }).catch(err => {
+                console.error('Erro ao copiar a chave Pix: ', err);
+                alert('Não foi possível copiar a chave. Por favor, copie manualmente.');
+            });
+        });
+    }
+});
+</script>
 </body>
 </html>
