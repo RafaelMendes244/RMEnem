@@ -559,6 +559,25 @@ def corrigir_redacao(redacao_id):
         app.logger.error(f"Erro na API do Gemini ou ao processar a resposta: {e}")
         return jsonify({'error': 'Não foi possível obter a correção da IA no momento.'}), 500
 
+@app.route('/api/gerar_tema_aleatorio', methods=['GET'])
+def gerar_tema_aleatorio():
+    # Este é o "pedido" que fazemos para a IA
+    prompt = """
+    Aja como um especialista em vestibulares e crie um único tema de redação inédito e plausível para o ENEM 2025.
+    O tema deve seguir o formato oficial, abordando um problema social, cultural ou científico relevante para o Brasil.
+    Exemplos de formato: "Desafios para...", "O papel de...", "A questão de... na sociedade brasileira".
+    Sua resposta deve ser APENAS o texto do tema, sem aspas, sem introduções como "Aqui está o tema:", apenas a frase do tema.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        response = model.generate_content(prompt)
+        tema_gerado = response.text.strip()
+        return jsonify({'tema': tema_gerado})
+    except Exception as e:
+        app.logger.error(f"Erro na API do Gemini ao gerar tema: {e}")
+        # Retorna um tema padrão em caso de falha na API
+        return jsonify({'tema': 'O desafio dos resíduos plásticos nos oceanos e o seu impacto no futuro do planeta'}), 500
+
 # --- 10. Rotas de Ranking ---
 @app.route('/ranking')
 def ranking_page():

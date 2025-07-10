@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Plataforma de simulados para o ENEM com questões reais, correção de redação por IA, ranking e análise de desempenho.">
+    <meta name="keywords" content="ENEM, Simulado, Redação, Correção, Ranking, Desempenho, Educação, Estudo">
+    <meta name="author" content="Rafael Mendes">
     <title>Praticar Redação - RM ENEM Simulador</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
@@ -26,34 +29,40 @@
                     <div class="card-body">
                         <form id="redacao-form">
                             <div class="form-group">
-                                <label for="tema-select" class="form-label">Escolha um Tema</label>
-                                <select id="tema-select" class="form-control">
-                                    <!-- Adicionando temas do ENEM 2009 a 2023 -->
-                                    <option value="O indivíduo frente à ética nacional: desafios para a formação de uma consciência crítica">ENEM 2009: O indivíduo frente à ética nacional: desafios para a formação de uma consciência crítica</option>
-                                    <option value="O trabalho e o exercício da cidadania no Brasil">ENEM 2010: O trabalho e o exercício da cidadania no Brasil</option>
-                                    <option value="O movimento imigratório para o Brasil no século XXI">ENEM 2011: O movimento imigratório para o Brasil no século XXI</option>
-                                    <option value="Os efeitos da implantação da internet nas relações sociais">ENEM 2012: Os efeitos da implantação da internet nas relações sociais</option>
-                                    <option value="Efeitos da expansão do acesso ao ensino superior no Brasil">ENEM 2013: Efeitos da expansão do acesso ao ensino superior no Brasil</option>
-                                    <option value="A violência contra a mulher na sociedade brasileira">ENEM 2014: A violência contra a mulher na sociedade brasileira</option>
-                                    <option value="Os desafios para a inclusão de pessoas com deficiência no Brasil">ENEM 2015: Os desafios para a inclusão de pessoas com deficiência no Brasil</option>
-                                    <option value="Caminhos para combater a intolerância religiosa no Brasil">ENEM 2016: Caminhos para combater a intolerância religiosa no Brasil</option>
-                                    <option value="Desafios para a formação educacional de surdos no Brasil">ENEM 2017: Desafios para a formação educacional de surdos no Brasil</option>
-                                    <option value="O impacto das novas tecnologias na educação">ENEM 2018: O impacto das novas tecnologias na educação</option>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <label for="tema-select" class="form-label">Escolha um Tema ou Gere um Aleatório</label>
+                                    <button type="button" id="random-theme-btn" class="btn btn-secondary btn-sm">
+                                        <i class="fas fa-random"></i> Gerar Tema (IA)
+                                    </button>
+                                </div>
+                                <select id="tema-select" class="form-control mt-2">
+                                    <option value="Desafios para o enfrentamento da invisibilidade do trabalho de cuidado realizado pela mulher no Brasil">ENEM 2023: Desafios para o enfrentamento da invisibilidade do trabalho de cuidado...</option>
+                                    <option value="Desafios para a valorização de comunidades e povos tradicionais no Brasil">ENEM 2022: Desafios para a valorização de comunidades e povos tradicionais...</option>
+                                    <option value="Invisibilidade e registro civil: garantia de acesso à cidadania no Brasil">ENEM 2021: Invisibilidade e registro civil: garantia de acesso à cidadania...</option>
+                                    <option value="O estigma associado às doenças mentais na sociedade brasileira">ENEM 2020: O estigma associado às doenças mentais...</option>
                                     <option value="Democratização do acesso ao cinema no Brasil">ENEM 2019: Democratização do acesso ao cinema no Brasil</option>
-                                    <option value="O estigma associado às doenças mentais na sociedade brasileira">ENEM 2020: O estigma associado às doenças mentais na sociedade brasileira</option>
-                                    <option value="Invisibilidade e registro civil: garantia de acesso à cidadania no Brasil">ENEM 2021: Invisibilidade e registro civil: garantia de acesso à cidadania no Brasil</option>
-                                    <option value="Desafios para a valorização de comunidades e povos tradicionais no Brasil">ENEM 2022: Desafios para a valorização de comunidades e povos tradicionais no Brasil</option>
-                                    <option value="O papel do Estado no enfrentamento da pobreza no Brasil">ENEM 2023: O papel do Estado no enfrentamento da pobreza no Brasil</option>
+                                    <option value="Manipulação do comportamento do usuário pelo controle de dados na internet">ENEM 2018: Manipulação do comportamento do usuário pelo controle de dados...</option>
+                                    <option value="Desafios para a formação educacional de surdos no Brasil">ENEM 2017: Desafios para a formação educacional de surdos...</option>
+                                    <option value="Caminhos para combater a intolerância religiosa no Brasil">ENEM 2016: Caminhos para combater a intolerância religiosa no Brasil</option>
+                                    <option value="A persistência da violência contra a mulher na sociedade brasileira">ENEM 2015: A persistência da violência contra a mulher...</option>
+                                    <option value="Publicidade infantil em questão no Brasil">ENEM 2014: Publicidade infantil em questão no Brasil</option>
+                                    <option value="Efeitos da implantação da Lei Seca no Brasil">ENEM 2013: Efeitos da implantação da Lei Seca no Brasil</option>
+                                    <option value="O movimento imigratório para o Brasil no século XXI">ENEM 2012: O movimento imigratório para o Brasil no século XXI</option>
+                                    <option value="Viver em rede no século XXI: os limites entre o público e o privado">ENEM 2011: Viver em rede no século XXI: os limites entre o público e o privado</option>
+                                    <option value="O trabalho na construção da dignidade humana">ENEM 2010: O trabalho na construção da dignidade humana</option>
+                                    <option value="O indivíduo frente à ética nacional">ENEM 2009: O indivíduo frente à ética nacional</option>
                                 </select>
+                            </div>
+                            <div class="mt-4">
+                                <h5 id="tema-selecionado" class="text-primary">Tema selecionado: Nenhum</h5>
                             </div>
                             <div class="form-group">
                                 <label for="redacao-textarea" class="form-label">Sua Redação</label>
-                                <textarea style="resize: none;" id="redacao-textarea" class="form-control" rows="20" placeholder="Comece a escrever sua redação aqui..."></textarea>
-                                <small class="text-muted">Dica: Escreva sua redação em um editor de texto e cole aqui para não perder seu progresso.</small>
+                                <textarea id="redacao-textarea" class="form-control" rows="20" placeholder="Comece a escrever sua redação aqui..."></textarea>
                             </div>
-                            <div class="form-group">
-                                <button type="submit" class="btn btn-primary btn-lg btn-block">
-                                    <i class="fas fa-save"></i> Salvar Redação
+                            <div class="form-group text-center">
+                                <button type="submit" class="btn btn-primary btn-lg">
+                                    <i class="fas fa-save"></i> Salvar Redação e Ver Histórico
                                 </button>
                             </div>
                         </form>
@@ -63,5 +72,27 @@
         </div>
     </div>
     <script src="/static/js/redacao.js"></script>
+
+<script>
+    const temaSelect = document.getElementById("tema-select");
+    const temaSelecionado = document.getElementById("tema-selecionado");
+    const randomBtn = document.getElementById("random-theme-btn");
+
+    // Atualiza o título quando o usuário escolhe manualmente
+    temaSelect.addEventListener("change", () => {
+        temaSelecionado.textContent = "Tema selecionado: " + temaSelect.value;
+    });
+
+    // Escolhe um tema aleatório quando o botão é clicado
+    randomBtn.addEventListener("click", () => {
+        const options = temaSelect.options;
+        const randomIndex = Math.floor(Math.random() * options.length);
+        temaSelect.selectedIndex = randomIndex;
+        temaSelecionado.textContent = "Tema selecionado: " + options[randomIndex].value;
+    });
+
+    // Inicializar com o primeiro tema, se desejado
+    temaSelecionado.textContent = "Tema selecionado: " + temaSelect.value;
+</script>
 </body>
 </html>
