@@ -5,7 +5,7 @@
 # --- 1. Imports de Bibliotecas ---
 import os
 import requests
-import sqlite3
+import sqlite3 # Mantido para o caso de algum resquício, mas não é mais o principal
 import json
 from datetime import datetime
 from functools import wraps
@@ -13,103 +13,64 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, g
 from werkzeug.security import generate_password_hash, check_password_hash
 import google.generativeai as genai
+import psycopg2 # A nova biblioteca para PostgreSQL
+from psycopg2.extras import RealDictCursor # Para retornar dicionários, como antes
 
-# Carrega as variáveis de ambiente do arquivo .env
+# --- 1. Inicialização e Configuração ---
 load_dotenv()
-
-# --- 2. Configuração da Aplicação ---
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 
-# Configuração da API ENEM
-ENEM_API_KEY = os.getenv('API_ENEM_KEY')
 ENEM_API_BASE_URL = 'https://enem-api-gules.vercel.app/v1'
+try:
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+except Exception as e:
+    print(f"AVISO: Chave da API do Gemini não configurada. Erro: {e}")
 
-# Configuração da API Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
-# Otimização: Cache em memória para as questões
 questions_cache = {}
 
-# --- 3. Configuração do Banco de Dados ---
+# --- 2. Gerenciamento de Banco de Dados (PostgreSQL) ---
 def get_db_connection():
-    conn = sqlite3.connect('database.db')
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")  # Modo Write-Ahead Logging
-    conn.execute("PRAGMA busy_timeout=30000")  # Timeout de 30 segundos
-    return conn
+    if 'db' not in g:
+        # Usa a variável de ambiente DATABASE_URL para conectar
+        g.db = psycopg2.connect(os.getenv('DATABASE_URL'), cursor_factory=RealDictCursor)
+    return g.db
 
-def with_db_connection(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        conn = None
-        try:
-            conn = get_db_connection()
-            g.db = conn
-            result = func(*args, **kwargs)
-            conn.commit()
-            return result
-        except Exception as e:
-            if conn:
-                conn.rollback()
-            app.logger.error(f"Database error: {e}")
-            raise e
-        finally:
-            if conn:
-                conn.close()
-    return wrapper
+@app.teardown_appcontext
+def close_db(e=None):
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
 
+# Função para criar as tabelas no banco de dados PostgreSQL
 def init_db():
-    with app.app_context():
-        conn = get_db_connection()
-        conn.execute('''
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # Usa sintaxe PostgreSQL (SERIAL PRIMARY KEY, TIMESTAMPTZ)
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            name TEXT
-        )
-        ''')
-        conn.execute('''
+            id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, name TEXT
+        );''')
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS simulados (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_email TEXT NOT NULL,
-            prova_year TEXT NOT NULL,
-            duracao_segundos INTEGER,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_email) REFERENCES users (email)
-        )
-        ''')
-        conn.execute('''
+            id SERIAL PRIMARY KEY, user_email TEXT NOT NULL, prova_year TEXT NOT NULL, duracao_segundos INTEGER,
+            timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_email) REFERENCES users (email)
+        );''')
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS respostas_simulado (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            simulado_id INTEGER NOT NULL,
-            question_unique_id TEXT NOT NULL,
-            user_answer TEXT NOT NULL,
-            FOREIGN KEY (simulado_id) REFERENCES simulados (id)
-        )
-        ''')
-        conn.execute('''
+            id SERIAL PRIMARY KEY, simulado_id INTEGER NOT NULL, question_unique_id TEXT NOT NULL,
+            user_answer TEXT NOT NULL, FOREIGN KEY (simulado_id) REFERENCES simulados (id)
+        );''')
+    cur.execute('''
         CREATE TABLE IF NOT EXISTS redacoes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_email TEXT NOT NULL,
-            tema TEXT NOT NULL,
-            texto_redacao TEXT NOT NULL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-            nota_total INTEGER,
-            nota_c1 INTEGER,
-            nota_c2 INTEGER,
-            nota_c3 INTEGER,
-            nota_c4 INTEGER,
-            nota_c5 INTEGER,
-            feedback TEXT,
+            id SERIAL PRIMARY KEY, user_email TEXT NOT NULL, tema TEXT NOT NULL, texto_redacao TEXT NOT NULL,
+            timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, nota_total INTEGER, nota_c1 INTEGER, nota_c2 INTEGER,
+            nota_c3 INTEGER, nota_c4 INTEGER, nota_c5 INTEGER, feedback TEXT,
             FOREIGN KEY (user_email) REFERENCES users (email)
-        )
-        ''')
-        conn.commit()
-        conn.close()
-
-init_db()
+        );''')
+    conn.commit()
+    cur.close()
+    print("Banco de dados PostgreSQL inicializado com sucesso.")
 
 # --- 4. Decorators ---
 def login_required(f):
@@ -123,8 +84,7 @@ def login_required(f):
 
 # --- 5. Funções Auxiliares ---
 def get_questions_from_api_with_cache(year):
-    if year in questions_cache:
-        return questions_cache[year]
+    if year in questions_cache: return questions_cache[year]
     try:
         response = requests.get(f'{ENEM_API_BASE_URL}/exams/{year}/questions?limit=180')
         response.raise_for_status()
@@ -137,21 +97,17 @@ def get_questions_from_api_with_cache(year):
 
 def format_duration(seconds):
     if seconds is None: return "N/A"
-    h = seconds // 3600
-    m = (seconds % 3600) // 60
-    s = seconds % 60
+    h, m, s = seconds // 3600, (seconds % 3600) // 60, seconds % 60
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 # --- 6. Rotas de Autenticação ---
 @app.route("/")
 def index():
-    user = session.get('user')
-    return render_template('index.html', user=user)
+    return render_template('index.html', user=session.get('user'))
 
 @app.route("/login")
 def login():
-    if 'user' in session:
-        return redirect(url_for('index'))
+    if 'user' in session: return redirect(url_for('index'))
     return render_template('login.html')
 
 @app.route('/login/email', methods=['POST'])
@@ -160,53 +116,46 @@ def login_email():
     password = request.form['password']
     
     conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE email = ?', (email,)).fetchone()
-    conn.close()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM users WHERE email = %s', (email,))
+    user = cur.fetchone()
+    cur.close()
     
-    if not user:
-        flash('Usuário não cadastrado.', 'error')
-    elif not check_password_hash(user['password'], password):
-        flash('Senha Incorreta!', 'error')
-    else:
-        session['user'] = {
-            'email': user['email'],
-            'name': user['name'] or user['email'].split('@')[0]
-        }
-        flash('Login Efetuado com Sucesso.', 'success')
+    if user and check_password_hash(user['password'], password):
+        session['user'] = {'email': user['email'], 'name': user['name'] or user['email'].split('@')[0]}
+        flash('Login realizado com sucesso!', 'success')
         return redirect(url_for('index'))
-    
+    elif not user:
+        flash('Usuário não cadastrado.', 'danger')
+    else:
+        flash('Senha incorreta.', 'danger')
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['POST'])
-@with_db_connection
 def register():
     email = request.form['email']
     password = request.form['password']
     name = request.form.get('name', '')
 
-    hashed_password = generate_password_hash(password)
-    
-    try:
-        cursor = g.db.execute('SELECT 1 FROM users WHERE email = ?', (email,))
-        if cursor.fetchone():
-            flash('Este email já está cadastrado. Por favor, tente fazer o login.', 'error')
-            return redirect(url_for('login'))
-
-        g.db.execute('INSERT INTO users (email, password, name) VALUES (?, ?, ?)',
-                    (email, hashed_password, name))
-        
-        session['user'] = {
-            'email': email,
-            'name': name or email.split('@')[0]
-        }
-        flash('Cadastro realizado com sucesso!', 'success')
-        return redirect(url_for('index'))
-        
-    except Exception as e:
-        flash(f'Ocorreu um erro inesperado: {str(e)}', 'error')
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('SELECT * FROM users WHERE email = %s', (email,))
+    if cur.fetchone():
+        flash('Este email já está cadastrado.', 'danger')
+        cur.close()
         return redirect(url_for('login'))
+        
+    hashed_password = generate_password_hash(password)
+    cur.execute('INSERT INTO users (email, password, name) VALUES (%s, %s, %s)', (email, hashed_password, name))
+    conn.commit()
+    cur.close()
+    
+    session['user'] = {'email': email, 'name': name or email.split('@')[0]}
+    flash('Cadastro realizado com sucesso!', 'success')
+    return redirect(url_for('index'))
 
 @app.route("/logout")
+@login_required
 def logout():
     session.pop('user', None)
     flash('Você foi desconectado com sucesso.', 'success')
