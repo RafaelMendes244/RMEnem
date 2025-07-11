@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redefinir Senha - RM ENEM Simulador</title>
+    <meta name="description" content="Recupere o acesso à sua conta na plataforma de simulados RM ENEM.">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="main-header">
+        <div class="container">
+            <nav class="navbar">
+                <a href="{{ url_for('index') }}" class="navbar-brand">
+                    <span class="logo">RM Simulador</span>
+                </a>
+                <div class="navbar-nav">
+                    {% if user %}
+                        <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm">Sair</a>
+                    {% else %}
+                        <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm">Entrar</a>
+                    {% endif %}
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-content-wrapper">
+        <div class="container" style="max-width: 550px;">
+            <div class="main-content">
+                <div class="text-center">
+                    <h1><i class="fas fa-key"></i> Redefinir Senha</h1>
+                    <p class="text-muted mb-4">Digite o e-mail associado à sua conta e enviaremos um link para você criar uma nova senha.</p>
+                </div>
+                
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                        <div class="alert alert-{{ category or 'info' }}"> 
+                            {{ message }}
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+
+                <form method="POST" action="{{ url_for('esqueci_senha_page') }}">
+                    <div class="form-group">
+                        <label for="email" class="form-label">Seu e-mail cadastrado:</label>
+                        <input type="email" name="email" id="email" class="form-control" required placeholder="seu@email.com">
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg btn-block"><i class="fas fa-paper-plane"></i> Enviar Link de Redefinição</button>
+                </form>
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('login') }}" class="text-muted"><i class="fas fa-arrow-left"></i> Lembrei minha senha</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="main-footer">
+        <p>Desenvolvido por Rafael Mendes - RM Aprendizado</p>
+        <div class="footer-links">
+            <a href="{{ url_for('reportar_bug_page') }}">Reportar um Bug</a>
+            <span>&middot;</span>
+            <a href="{{ url_for('apoie_page') }}">Apoie o Projeto</a>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const allAlerts = document.querySelectorAll('.alert');
+            allAlerts.forEach(alert => {
+                setTimeout(() => {
+                    alert.style.transition = 'opacity 0.5s ease';
+                    alert.style.opacity = '0';
+                    setTimeout(() => alert.remove(), 500);
+                }, 5000);
+            });
+        });
+    </script>
+</body>
+</html>

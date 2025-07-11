@@ -5,7 +5,6 @@
 # --- 1. Imports de Bibliotecas ---
 import os
 import requests
-import sqlite3 # Mantido para o caso de algum resquício, mas não é mais o principal
 import json
 from datetime import datetime
 from functools import wraps
@@ -13,8 +12,10 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, g
 from werkzeug.security import generate_password_hash, check_password_hash
 import google.generativeai as genai
-import psycopg2 # A nova biblioteca para PostgreSQL
-from psycopg2.extras import RealDictCursor # Para retornar dicionários, como antes
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from flask_mail import Mail, Message
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 
 # --- 1. Inicialização e Configuração ---
 load_dotenv()
@@ -29,11 +30,27 @@ except Exception as e:
 
 questions_cache = {}
 
+# --- Configuração do Flask-Mail ---
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 465
+app.config['MAIL_USERNAME'] = os.getenv('MAIL_USERNAME')
+app.config['MAIL_PASSWORD'] = os.getenv('MAIL_PASSWORD')
+app.config['MAIL_USE_TLS'] = False
+app.config['MAIL_USE_SSL'] = True
+mail = Mail(app)
+
+# --- Configuração do URLSafeTimedSerializer para verificação de e-mail ---
+mail = Mail(app)
+s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
+
 # --- 2. Gerenciamento de Banco de Dados (PostgreSQL) ---
 def get_db_connection():
     if 'db' not in g:
-        # Usa a variável de ambiente DATABASE_URL para conectar
-        g.db = psycopg2.connect(os.getenv('DATABASE_URL'), cursor_factory=RealDictCursor)
+        try:
+            g.db = psycopg2.connect(os.getenv('DATABASE_URL'), cursor_factory=RealDictCursor)
+        except psycopg2.Error as e:
+            app.logger.error(f"Erro ao conectar ao PostgreSQL: {e}")
+            raise
     return g.db
 
 @app.teardown_appcontext
@@ -42,34 +59,58 @@ def close_db(e=None):
     if db is not None:
         db.close()
 
-# Função para criar as tabelas no banco de dados PostgreSQL
 def init_db():
     conn = get_db_connection()
     cur = conn.cursor()
-    # Usa sintaxe PostgreSQL (SERIAL PRIMARY KEY, TIMESTAMPTZ)
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id SERIAL PRIMARY KEY, email TEXT UNIQUE NOT NULL, password TEXT NOT NULL, name TEXT
-        );''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS simulados (
-            id SERIAL PRIMARY KEY, user_email TEXT NOT NULL, prova_year TEXT NOT NULL, duracao_segundos INTEGER,
-            timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_email) REFERENCES users (email)
-        );''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS respostas_simulado (
-            id SERIAL PRIMARY KEY, simulado_id INTEGER NOT NULL, question_unique_id TEXT NOT NULL,
-            user_answer TEXT NOT NULL, FOREIGN KEY (simulado_id) REFERENCES simulados (id)
-        );''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS redacoes (
-            id SERIAL PRIMARY KEY, user_email TEXT NOT NULL, tema TEXT NOT NULL, texto_redacao TEXT NOT NULL,
-            timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, nota_total INTEGER, nota_c1 INTEGER, nota_c2 INTEGER,
-            nota_c3 INTEGER, nota_c4 INTEGER, nota_c5 INTEGER, feedback TEXT,
-            FOREIGN KEY (user_email) REFERENCES users (email)
-        );''')
-    conn.commit()
-    cur.close()
+    try:
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY, 
+                email TEXT UNIQUE NOT NULL, 
+                password TEXT NOT NULL, 
+                name TEXT,
+                is_verified INTEGER NOT NULL DEFAULT 0
+            )''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS simulados (
+                id SERIAL PRIMARY KEY, 
+                user_email TEXT NOT NULL, 
+                prova_year TEXT NOT NULL, 
+                duracao_segundos INTEGER,
+                timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, 
+                FOREIGN KEY (user_email) REFERENCES users (email)
+            )''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS respostas_simulado (
+                id SERIAL PRIMARY KEY, 
+                simulado_id INTEGER NOT NULL, 
+                question_unique_id TEXT NOT NULL,
+                user_answer TEXT NOT NULL, 
+                FOREIGN KEY (simulado_id) REFERENCES simulados (id)
+            )''')
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS redacoes (
+                id SERIAL PRIMARY KEY, 
+                user_email TEXT NOT NULL, 
+                tema TEXT NOT NULL, 
+                texto_redacao TEXT NOT NULL,
+                timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP, 
+                nota_total INTEGER, 
+                nota_c1 INTEGER, 
+                nota_c2 INTEGER,
+                nota_c3 INTEGER, 
+                nota_c4 INTEGER, 
+                nota_c5 INTEGER, 
+                feedback TEXT,
+                FOREIGN KEY (user_email) REFERENCES users (email)
+            )''')
+        conn.commit()
+    except psycopg2.Error as e:
+        conn.rollback()
+        app.logger.error(f"Erro ao criar tabelas: {e}")
+        raise
+    finally:
+        cur.close()
     print("Banco de dados PostgreSQL inicializado com sucesso.")
 
 # --- 4. Decorators ---
@@ -117,18 +158,21 @@ def login_email():
     
     conn = get_db_connection()
     cur = conn.cursor()
+    # CORREÇÃO: Usa %s em vez de ?
     cur.execute('SELECT * FROM users WHERE email = %s', (email,))
     user = cur.fetchone()
     cur.close()
     
-    if user and check_password_hash(user['password'], password):
-        session['user'] = {'email': user['email'], 'name': user['name'] or user['email'].split('@')[0]}
-        flash('Login realizado com sucesso!', 'success')
-        return redirect(url_for('index'))
-    elif not user:
+    if not user:
         flash('Usuário não cadastrado.', 'danger')
-    else:
+    elif not user['is_verified']:
+        flash('Sua conta ainda não foi verificada. Por favor, verifique seu e-mail.', 'warning')
+    elif not check_password_hash(user['password'], password):
         flash('Senha incorreta.', 'danger')
+    else:
+        session['user'] = {'email': user['email'], 'name': user['name'] or user['email'].split('@')[0]}
+        return redirect(url_for('index'))
+    
     return redirect(url_for('login'))
 
 @app.route('/register', methods=['POST'])
@@ -136,23 +180,138 @@ def register():
     email = request.form['email']
     password = request.form['password']
     name = request.form.get('name', '')
-
+    
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor() # PostgreSQL usa um cursor para executar comandos
+    
+    # CORREÇÃO: Usa %s em vez de ?
     cur.execute('SELECT * FROM users WHERE email = %s', (email,))
+    
     if cur.fetchone():
-        flash('Este email já está cadastrado.', 'danger')
+        flash('Este email já está cadastrado. Por favor, tente fazer o login.', 'danger')
         cur.close()
         return redirect(url_for('login'))
         
     hashed_password = generate_password_hash(password)
-    cur.execute('INSERT INTO users (email, password, name) VALUES (%s, %s, %s)', (email, hashed_password, name))
+    # CORREÇÃO: Usa %s em vez de ?
+    cur.execute('INSERT INTO users (email, password, name) VALUES (%s, %s, %s)',
+                (email, hashed_password, name))
+    conn.commit() # Salva as alterações
+    cur.close()
+
+    # A lógica de envio de e-mail continua a mesma
+    token = s.dumps(email, salt='email-confirm')
+    confirm_url = url_for('confirmar_email', token=token, _external=True)
+    html = render_template('email_confirmacao.html', confirm_url=confirm_url)
+    msg = Message('Confirme seu E-mail - RM ENEM Simulador',
+                sender=('RM ENEM Simulador', app.config['MAIL_USERNAME']), 
+                recipients=[email],
+                html=html)
+    mail.send(msg)
+
+    flash('Cadastro realizado! Um e-mail de confirmação foi enviado para sua caixa de entrada.', 'success')
+    return redirect(url_for('login'))
+
+@app.route('/confirmar/<token>')
+def confirmar_email(token):
+    try:
+        email = s.loads(token, salt='email-confirm', max_age=3600)
+    except SignatureExpired:
+        flash('O link de confirmação expirou. Por favor, tente se cadastrar novamente.', 'danger')
+        return redirect(url_for('login'))
+    except Exception:
+        flash('O link de confirmação é inválido ou já foi usado.', 'danger')
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cur = conn.cursor()
+    # CORREÇÃO: Usa %s em vez de ?
+    cur.execute('UPDATE users SET is_verified = TRUE WHERE email = %s', (email,))
     conn.commit()
     cur.close()
+
+    flash('Sua conta foi verificada com sucesso! Você já pode fazer o login.', 'success')
+    return redirect(url_for('login'))
+
+@app.route('/esqueci-senha', methods=['GET', 'POST'])
+def esqueci_senha_page():
+    # Se o usuário já estiver logado, não faz sentido ele estar aqui
+    if 'user' in session:
+        return redirect(url_for('index'))
     
-    session['user'] = {'email': email, 'name': name or email.split('@')[0]}
-    flash('Cadastro realizado com sucesso!', 'success')
-    return redirect(url_for('index'))
+    # Se o formulário for enviado (método POST)
+    if request.method == 'POST':
+        email = request.form.get('email')
+        conn = get_db_connection()
+        cur = conn.cursor() # Cria um cursor para o PostgreSQL
+        
+        # Usa %s como placeholder
+        cur.execute('SELECT * FROM users WHERE email = %s', (email,))
+        user = cur.fetchone()
+        cur.close() # Fecha o cursor após a consulta
+
+        # Por segurança, mostramos a mesma mensagem mesmo que o e-mail não exista
+        # para não informar a hackers quais e-mails estão ou não cadastrados.
+        if user:
+            # Gera um token seguro e com tempo de validade (1 hora)
+            token = s.dumps(email, salt='password-reset-salt')
+            reset_url = url_for('redefinir_senha_page', token=token, _external=True)
+
+            # Renderiza o template do corpo do e-mail
+            html = render_template('email_redefinir_senha.html', reset_url=reset_url)
+            
+            # Cria a mensagem do e-mail
+            msg = Message('Redefinição de Senha - RM ENEM Simulador',
+                        sender=('RM ENEM Simulador', app.config['MAIL_USERNAME']),
+                        recipients=[email],
+                        html=html)
+            mail.send(msg)
+            
+        flash('Se o seu e-mail estiver em nosso sistema, um link para redefinição de senha foi enviado.', 'success')
+        return redirect(url_for('login'))
+
+    # Se a requisição for GET, apenas mostra a página
+    return render_template('esqueci_senha.html')
+
+@app.route('/redefinir-senha/<token>', methods=['GET', 'POST'])
+def redefinir_senha_page(token):
+    if 'user' in session:
+        return redirect(url_for('index'))
+        
+    try:
+        # Valida o token e extrai o e-mail. Expira em 3600 segundos (1 hora)
+        email = s.loads(token, salt='password-reset-salt', max_age=3600)
+    except SignatureExpired:
+        flash('O link de redefinição de senha expirou. Por favor, solicite um novo.', 'danger')
+        return redirect(url_for('esqueci_senha_page'))
+    except Exception:
+        flash('O link de redefinição de senha é inválido ou já foi usado.', 'danger')
+        return redirect(url_for('esqueci_senha_page'))
+
+    if request.method == 'POST':
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+
+        if password != confirm_password:
+            flash('As senhas não coincidem.', 'danger')
+            # Retorna para a mesma página para o usuário tentar de novo, mantendo o token na URL
+            return render_template('redefinir_senha.html', token=token)
+
+        if len(password) < 6:
+            flash('A nova senha deve ter pelo menos 6 caracteres.', 'danger')
+            return render_template('redefinir_senha.html', token=token)
+
+        hashed_password = generate_password_hash(password)
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute('UPDATE users SET password = %s WHERE email = %s', (hashed_password, email))
+        conn.commit()
+        cur.close()
+
+        flash('Sua senha foi redefinida com sucesso! Você já pode fazer o login.', 'success')
+        return redirect(url_for('login'))
+
+    return render_template('redefinir_senha.html', token=token)
 
 @app.route("/logout")
 @login_required
@@ -163,12 +322,10 @@ def logout():
 
 @app.route('/reportar-bug')
 def reportar_bug_page():
-    # Passamos o 'user' para que o campo de email possa ser preenchido automaticamente se o usuário estiver logado
     return render_template('reportar_bug.html', user=session.get('user'))
 
 @app.route('/obrigado')
 def obrigado_page():
-    # Esta rota apenas mostra a página de agradecimento
     return render_template('obrigado.html', user=session.get('user'))
 
 @app.route('/apoie')
@@ -212,36 +369,18 @@ def get_questoes(year):
 @login_required
 def submit_answers():
     data = request.json
-    year = data.get('year')
-    user_respostas = data.get('respostas', {})
-    duracao_segundos = data.get('duracaoSegundos')
-
-    if not year or not user_respostas:
-        return jsonify({'error': 'Dados de submissão incompletos'}), 400
-
-    user_email = session['user']['email']
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute('INSERT INTO simulados (user_email, prova_year, duracao_segundos) VALUES (%s, %s, %s) RETURNING id',
+                (session['user']['email'], data.get('year'), data.get('duracaoSegundos')))
+    simulado_id = cur.fetchone()['id']
     
-    try:
-        conn = get_db_connection()
-        cursor = conn.execute('''
-            INSERT INTO simulados (user_email, prova_year, duracao_segundos)
-            VALUES (?, ?, ?)
-        ''', (user_email, year, duracao_segundos))
-        simulado_id = cursor.lastrowid
-        
-        for question_unique_id, user_answer in user_respostas.items():
-            conn.execute('''
-                INSERT INTO respostas_simulado (simulado_id, question_unique_id, user_answer)
-                VALUES (?, ?, ?)
-            ''', (simulado_id, question_unique_id, user_answer))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({'success': True, 'redirect_url': url_for('resultado_detalhe', simulado_id=simulado_id)})
-    except Exception as e:
-        app.logger.error(f"Erro ao salvar respostas: {e}")
-        return jsonify({'error': str(e)}), 500
+    for q_title, u_answer in data.get('respostas', {}).items():
+        cur.execute('INSERT INTO respostas_simulado (simulado_id, question_unique_id, user_answer) VALUES (%s, %s, %s)',
+                (simulado_id, q_title, u_answer))
+    conn.commit()
+    cur.close()
+    return jsonify({'success': True, 'redirect_url': url_for('resultado_detalhe', simulado_id=simulado_id)})
 
 # --- 8. Rotas de Resultados e Histórico ---
 @app.route('/historico')
@@ -254,19 +393,22 @@ def historico():
 def get_historico():
     user_email = session['user']['email']
     conn = get_db_connection()
+    cur = conn.cursor()
     historico_data = {'simulados': [], 'redacoes': []}
 
     try:
-        simulados_db = conn.execute(
-            'SELECT id, prova_year, duracao_segundos, timestamp FROM simulados WHERE user_email = ? ORDER BY timestamp DESC', 
+        cur.execute(
+            'SELECT id, prova_year, duracao_segundos, timestamp FROM simulados WHERE user_email = %s ORDER BY timestamp DESC', 
             (user_email,)
-        ).fetchall()
+        )
+        simulados_db = cur.fetchall()
 
         for s in simulados_db:
-            respostas_db = conn.execute(
-                'SELECT question_unique_id, user_answer FROM respostas_simulado WHERE simulado_id = ?', 
+            cur.execute(
+                'SELECT question_unique_id, user_answer FROM respostas_simulado WHERE simulado_id = %s', 
                 (s['id'],)
-            ).fetchall()
+            )
+            respostas_db = cur.fetchall()
             
             user_respostas = {r['question_unique_id']: r['user_answer'] for r in respostas_db}
             total_respondidas = len(user_respostas)
@@ -279,7 +421,7 @@ def get_historico():
                         if q_api.get('title') in user_respostas and user_respostas[q_api.get('title')] == q_api.get('correctAlternative'):
                             acertos += 1
             
-            timestamp_obj = datetime.strptime(s['timestamp'].split('.')[0], '%Y-%m-%d %H:%M:%S')
+            timestamp_obj = s['timestamp']
             
             historico_data['simulados'].append({
                 'id': s['id'], 
@@ -290,21 +432,25 @@ def get_historico():
                 'total_questoes_respondidas': total_respondidas
             })
 
-        redacoes_db = conn.execute(
-            'SELECT id, tema, timestamp FROM redacoes WHERE user_email = ? ORDER BY timestamp DESC', 
+        cur.execute(
+            'SELECT id, tema, timestamp FROM redacoes WHERE user_email = %s ORDER BY timestamp DESC', 
             (user_email,)
-        ).fetchall()
+        )
+        redacoes_db = cur.fetchall()
         
         for r in redacoes_db:
-            timestamp_obj = datetime.strptime(r['timestamp'].split('.')[0], '%Y-%m-%d %H:%M:%S')
+            timestamp_obj = r['timestamp']
             historico_data['redacoes'].append({
-                'id': r['id'], 
+                'id': r['id'],
                 'tema': r['tema'],
                 'timestamp': timestamp_obj.strftime('%d/%m/%Y')
             })
             
+    except Exception as e:
+        app.logger.error(f"Erro ao buscar histórico: {e}")
+        return jsonify({'error': 'Falha ao carregar o histórico.'}), 500
     finally:
-        if conn: conn.close()
+        cur.close()
             
     return jsonify(historico_data)
 
@@ -318,69 +464,71 @@ def resultado_detalhe(simulado_id):
 def get_resultado_detalhado(simulado_id):
     user_email = session['user']['email']
     conn = get_db_connection()
+    cur = conn.cursor()
 
-    # 1. Verifica se o simulado pertence ao usuário logado
-    simulado = conn.execute(
-        'SELECT * FROM simulados WHERE id = ? AND user_email = ?',
-        (simulado_id, user_email)
-    ).fetchone()
+    try:
+        cur.execute(
+            'SELECT * FROM simulados WHERE id = %s AND user_email = %s',
+            (simulado_id, user_email)
+        )
+        simulado = cur.fetchone()
 
-    if not simulado:
-        return jsonify({'error': 'Simulado não encontrado ou não pertence a este usuário.'}), 404
+        if not simulado:
+            return jsonify({'error': 'Simulado não encontrado ou não pertence a este usuário.'}), 404
 
-    # 2. Pega as respostas do usuário para este simulado
-    respostas_db = conn.execute(
-        'SELECT question_unique_id, user_answer FROM respostas_simulado WHERE simulado_id = ?',
-        (simulado_id,)
-    ).fetchall()
-    user_respostas = {r['question_unique_id']: r['user_answer'] for r in respostas_db}
-    
-    # 3. Usa a função de cache para buscar o gabarito completo da prova na API externa
-    prova_year = simulado['prova_year']
-    todas_questoes_da_prova = get_questions_from_api_with_cache(prova_year)
-
-    if not todas_questoes_da_prova:
-        return jsonify({'error': f'Não foi possível obter o gabarito para a prova de {prova_year}.'}), 500
-
-    # 4. Compara as respostas do usuário com o gabarito
-    acertos_totais = 0
-    respostas_detalhadas = []
-
-    # Itera sobre a lista de questões que o usuário respondeu
-    for q_unique_id, user_answer in user_respostas.items():
-        # Encontra a questão correspondente na lista completa da API
-        q_api = next((q for q in todas_questoes_da_prova if q.get('title') == q_unique_id), None)
+        cur.execute(
+            'SELECT question_unique_id, user_answer FROM respostas_simulado WHERE simulado_id = %s',
+            (simulado_id,)
+        )
+        respostas_db = cur.fetchall()
+        user_respostas = {r['question_unique_id']: r['user_answer'] for r in respostas_db}
         
-        if q_api:
-            acertou = (user_answer == q_api.get('correctAlternative'))
-            if acertou:
-                acertos_totais += 1
+        prova_year = simulado['prova_year']
+        todas_questoes_da_prova = get_questions_from_api_with_cache(prova_year)
+
+        if not todas_questoes_da_prova:
+            return jsonify({'error': f'Não foi possível obter o gabarito para a prova de {prova_year}.'}), 500
+
+        acertos_totais = 0
+        respostas_detalhadas = []
+
+        for q_unique_id, user_answer in user_respostas.items():
+            q_api = next((q for q in todas_questoes_da_prova if q.get('title') == q_unique_id), None)
             
-            respostas_detalhadas.append({
-                'question_number': q_api.get('index'),
-                'question_context': q_api.get('context'),
-                'alternativesIntroduction': q_api.get('alternativesIntroduction'),
-                'files': q_api.get('files'),
-                'alternatives': q_api.get('alternatives'),
-                'discipline': q_api.get('discipline'),
-                'user_answer': user_answer,
-                'correct_answer': q_api.get('correctAlternative'),
-                'acertou': acertou
-            })
+            if q_api:
+                acertou = (user_answer == q_api.get('correctAlternative'))
+                if acertou:
+                    acertos_totais += 1
+                
+                respostas_detalhadas.append({
+                    'question_number': q_api.get('index'),
+                    'question_context': q_api.get('context'),
+                    'alternativesIntroduction': q_api.get('alternativesIntroduction'),
+                    'files': q_api.get('files'),
+                    'alternatives': q_api.get('alternatives'),
+                    'discipline': q_api.get('discipline'),
+                    'user_answer': user_answer,
+                    'correct_answer': q_api.get('correctAlternative'),
+                    'acertou': acertou
+                })
 
-    total_questoes_respondidas = len(user_respostas)
-    porcentagem_total = (acertos_totais / total_questoes_respondidas) * 100 if total_questoes_respondidas > 0 else 0
+        total_questoes_respondidas = len(user_respostas)
+        porcentagem_total = (acertos_totais / total_questoes_respondidas) * 100 if total_questoes_respondidas > 0 else 0
 
-    # 5. Retorna todos os dados para o front-end
-    return jsonify({
-        'prova_year': simulado['prova_year'],
-        'timestamp': datetime.strptime(simulado['timestamp'].split('.')[0], '%Y-%m-%d %H:%M:%S').strftime('%d/%m/%Y %H:%M'),
-        'duracao_segundos': simulado['duracao_segundos'],
-        'acertos_totais': acertos_totais,
-        'total_questoes': total_questoes_respondidas,
-        'porcentagem_total': round(porcentagem_total, 2),
-        'respostas_detalhadas': sorted(respostas_detalhadas, key=lambda x: x['question_number'])
-    })
+        return jsonify({
+            'prova_year': simulado['prova_year'],
+            'timestamp': simulado['timestamp'].strftime('%d/%m/%Y %H:%M'),
+            'duracao_segundos': simulado['duracao_segundos'],
+            'acertos_totais': acertos_totais,
+            'total_questoes': total_questoes_respondidas,
+            'porcentagem_total': round(porcentagem_total, 2),
+            'respostas_detalhadas': sorted(respostas_detalhadas, key=lambda x: x['question_number'])
+        })
+    except Exception as e:
+        app.logger.error(f"Erro ao buscar resultado detalhado: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        cur.close()
 
 # --- 9. Rotas de Redação ---
 @app.route('/redacao')
@@ -399,11 +547,11 @@ def salvar_redacao():
     if not tema or not texto_redacao or len(texto_redacao) < 100:
         return jsonify({'error': 'Tema e texto da redação (mínimo 100 caracteres) são obrigatórios.'}), 400
 
-    conn = None
+    conn = get_db_connection()
+    cur = conn.cursor()
     try:
-        conn = get_db_connection()
-        conn.execute(
-            'INSERT INTO redacoes (user_email, tema, texto_redacao) VALUES (?, ?, ?)',
+        cur.execute(
+            'INSERT INTO redacoes (user_email, tema, texto_redacao) VALUES (%s, %s, %s)',
             (user_email, tema, texto_redacao)
         )
         conn.commit()
@@ -412,105 +560,110 @@ def salvar_redacao():
         app.logger.error(f"Erro ao salvar redação: {e}")
         return jsonify({'error': 'Ocorreu um erro ao salvar a redação.'}), 500
     finally:
-        if conn:
-            conn.close()
+        cur.close()
 
 @app.route('/redacao/<int:redacao_id>')
 @login_required
 def ver_redacao(redacao_id):
     conn = get_db_connection()
-    redacao_db = conn.execute(
-        'SELECT * FROM redacoes WHERE id = ? AND user_email = ?',
-        (redacao_id, session['user']['email'])
-    ).fetchone()
-    conn.close()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            'SELECT * FROM redacoes WHERE id = %s AND user_email = %s',
+            (redacao_id, session['user']['email'])
+        )
+        redacao_db = cur.fetchone()
 
-    if not redacao_db:
-        flash('Redação não encontrada ou não pertence a este usuário.', 'danger')
-        return redirect(url_for('historico'))
-    
-    redacao = dict(redacao_db)
-    timestamp_obj = datetime.strptime(redacao['timestamp'].split('.')[0], '%Y-%m-%d %H:%M:%S')
-    redacao['timestamp_formatado'] = timestamp_obj.strftime('%d/%m/%Y às %H:%M')
-    
-    return render_template('ver_redacao.html', user=session.get('user'), redacao=redacao)
+        if not redacao_db:
+            flash('Redação não encontrada ou não pertence a este usuário.', 'danger')
+            return redirect(url_for('historico'))
+        
+        redacao = dict(redacao_db)
+        redacao['timestamp_formatado'] = redacao['timestamp'].strftime('%d/%m/%Y às %H:%M')
+        
+        return render_template('ver_redacao.html', user=session.get('user'), redacao=redacao)
+    finally:
+        cur.close()
 
 @app.route('/api/corrigir_redacao/<int:redacao_id>', methods=['POST'])
 @login_required
 def corrigir_redacao(redacao_id):
     conn = get_db_connection()
-    redacao = conn.execute(
-        'SELECT * FROM redacoes WHERE id = ? AND user_email = ?',
-        (redacao_id, session['user']['email'])
-    ).fetchone()
-
-    if not redacao:
-        conn.close()
-        return jsonify({'error': 'Redação não encontrada.'}), 404
-
-    if redacao['feedback']:
-        conn.close()
-        return jsonify({
-            'nota_total': redacao['nota_total'],
-            'notas': [redacao['nota_c1'], redacao['nota_c2'], redacao['nota_c3'], redacao['nota_c4'], redacao['nota_c5']],
-            'feedback': redacao['feedback']
-        })
-
-    texto_redacao = redacao['texto_redacao']
-
-    prompt = f"""
-    Aja como um corretor experiente do ENEM. Avalie a seguinte redação com base nas 5 competências do ENEM.
-    Para cada competência, atribua uma nota de 0 a 200, em múltiplos de 40.
-    A nota total deve ser a soma das 5 competências.
-    Forneça um feedback geral construtivo sobre o texto, destacando pontos fortes e áreas para melhoria.
-    O formato da sua resposta DEVE ser um objeto JSON válido, sem nenhum texto antes ou depois, com a seguinte estrutura:
-    {{
-    "nota_c1": <nota>,
-    "nota_c2": <nota>,
-    "nota_c3": <nota>,
-    "nota_c4": <nota>,
-    "nota_c5": <nota>,
-    "nota_total": <nota_total>,
-    "feedback": "<seu feedback em texto aqui>"
-    }}
-
-    REDAÇÃO PARA AVALIAR:
-    ---
-    {texto_redacao}
-    ---
-    """
-
+    cur = conn.cursor()
     try:
+        cur.execute(
+            'SELECT * FROM redacoes WHERE id = %s AND user_email = %s',
+            (redacao_id, session['user']['email'])
+        )
+        redacao = cur.fetchone()
+
+        if not redacao:
+            return jsonify({'error': 'Redação não encontrada.'}), 404
+
+        if redacao['feedback']:
+            return jsonify({
+                'nota_total': redacao['nota_total'],
+                'notas': [redacao['nota_c1'], redacao['nota_c2'], redacao['nota_c3'], 
+                         redacao['nota_c4'], redacao['nota_c5']],
+                'feedback': redacao['feedback']
+            })
+
+        texto_redacao = redacao['texto_redacao']
+
+        prompt = f"""
+        Aja como um corretor experiente do ENEM. Avalie a seguinte redação com base nas 5 competências do ENEM.
+        Para cada competência, atribua uma nota de 0 a 200, em múltiplos de 40.
+        A nota total deve ser a soma das 5 competências.
+        Forneça um feedback geral construtivo sobre o texto, destacando pontos fortes e áreas para melhoria.
+        O formato da sua resposta DEVE ser um objeto JSON válido, sem nenhum texto antes ou depois, com a seguinte estrutura:
+        {{
+        "nota_c1": <nota>,
+        "nota_c2": <nota>,
+        "nota_c3": <nota>,
+        "nota_c4": <nota>,
+        "nota_c5": <nota>,
+        "nota_total": <nota_total>,
+        "feedback": "<seu feedback em texto aqui>"
+        }}
+
+        REDAÇÃO PARA AVALIAR:
+        ---
+        {texto_redacao}
+        ---
+        """
+
         model = genai.GenerativeModel('gemini-1.5-flash-latest')
         response = model.generate_content(prompt)
         
         clean_response = response.text.replace('```json', '').replace('```', '').strip()
         correcao = json.loads(clean_response)
 
-        conn.execute(
+        cur.execute(
             '''UPDATE redacoes SET 
-            nota_c1 = ?, nota_c2 = ?, nota_c3 = ?, nota_c4 = ?, nota_c5 = ?, nota_total = ?, feedback = ?
-            WHERE id = ?''',
-            (correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], correcao['nota_c4'], correcao['nota_c5'], correcao['nota_total'], correcao['feedback'], redacao_id)
+            nota_c1 = %s, nota_c2 = %s, nota_c3 = %s, nota_c4 = %s, nota_c5 = %s, nota_total = %s, feedback = %s
+            WHERE id = %s''',
+            (correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], 
+             correcao['nota_c4'], correcao['nota_c5'], correcao['nota_total'], 
+             correcao['feedback'], redacao_id)
         )
         conn.commit()
-        conn.close()
         
         resposta_final = {
             'nota_total': correcao['nota_total'],
-            'notas': [correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], correcao['nota_c4'], correcao['nota_c5']],
+            'notas': [correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], 
+                     correcao['nota_c4'], correcao['nota_c5']],
             'feedback': correcao['feedback']
         }
         return jsonify(resposta_final)
 
     except Exception as e:
-        conn.close()
         app.logger.error(f"Erro na API do Gemini ou ao processar a resposta: {e}")
         return jsonify({'error': 'Não foi possível obter a correção da IA no momento.'}), 500
+    finally:
+        cur.close()
 
 @app.route('/api/gerar_tema_aleatorio', methods=['GET'])
 def gerar_tema_aleatorio():
-    # Este é o "pedido" que fazemos para a IA
     prompt = """
     Aja como um especialista em vestibulares e crie um único tema de redação inédito e plausível para o ENEM 2025.
     O tema deve seguir o formato oficial, abordando um problema social, cultural ou científico relevante para o Brasil.
@@ -524,7 +677,6 @@ def gerar_tema_aleatorio():
         return jsonify({'tema': tema_gerado})
     except Exception as e:
         app.logger.error(f"Erro na API do Gemini ao gerar tema: {e}")
-        # Retorna um tema padrão em caso de falha na API
         return jsonify({'tema': 'O desafio dos resíduos plásticos nos oceanos e o seu impacto no futuro do planeta'}), 500
 
 # --- 10. Rotas de Ranking ---
@@ -535,11 +687,16 @@ def ranking_page():
 @app.route('/api/ranking_geral')
 def get_ranking_geral():
     conn = get_db_connection()
+    cur = conn.cursor()
     try:
-        # Pega todos os dados necessários do banco de uma vez
-        simulados = conn.execute('SELECT * FROM simulados').fetchall()
-        usuarios = conn.execute('SELECT email, name FROM users').fetchall()
-        respostas = conn.execute('SELECT * FROM respostas_simulado').fetchall()
+        cur.execute('SELECT * FROM simulados')
+        simulados = cur.fetchall()
+        
+        cur.execute('SELECT email, name FROM users')
+        usuarios = cur.fetchall()
+        
+        cur.execute('SELECT * FROM respostas_simulado')
+        respostas = cur.fetchall()
 
         usuarios_dict = {u['email']: u['name'] for u in usuarios}
         respostas_por_simulado = {}
@@ -561,7 +718,6 @@ def get_ranking_geral():
             questoes_api = get_questions_from_api_with_cache(s['prova_year'])
             if questoes_api:
                 for q_api in questoes_api:
-                    # CORREÇÃO PRINCIPAL: Usa o título para comparar, como no resto do app
                     q_unique_id = q_api.get('title')
                     if q_unique_id in user_respostas and user_respostas[q_unique_id] == q_api.get('correctAlternative'):
                         acertos += 1
@@ -595,6 +751,8 @@ def get_ranking_geral():
     except Exception as e:
         app.logger.error(f"Erro ao gerar ranking: {e}")
         return jsonify({'error': 'Falha ao gerar o ranking.'}), 500
+    finally:
+        cur.close()
 
 # --- 11. Rotas de Administração ---
 @app.route('/admin/view_db/<secret_key>')
@@ -606,19 +764,20 @@ def view_db(secret_key):
 
     try:
         conn = get_db_connection()
-        tables_cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table';")
-        tables = [table['name'] for table in tables_cursor.fetchall()]
+        cur = conn.cursor()
+        cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")
+        tables = [table['table_name'] for table in cur.fetchall()]
         
         db_data = {}
         for table_name in tables:
-            if table_name != 'sessions':
-                data_cursor = conn.execute(f"SELECT * FROM {table_name}")
-                db_data[table_name] = data_cursor.fetchall()
+            cur.execute(f"SELECT * FROM {table_name}")
+            db_data[table_name] = cur.fetchall()
         
-        conn.close()
         return render_template('admin_view.html', db_data=db_data)
     except Exception as e:
         return f"Ocorreu um erro ao acessar o banco de dados: {e}"
+    finally:
+        cur.close()
 
 # --- 12. Execução da Aplicação ---
 if __name__ == '__main__':
