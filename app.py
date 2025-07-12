@@ -69,7 +69,7 @@ def init_db():
                 email TEXT UNIQUE NOT NULL, 
                 password TEXT NOT NULL, 
                 name TEXT,
-                is_verified INTEGER NOT NULL DEFAULT 0
+                is_verified BOOLEAN NOT NULL DEFAULT FALSE
             )''')
         cur.execute('''
             CREATE TABLE IF NOT EXISTS simulados (
@@ -813,4 +813,6 @@ def view_db(secret_key):
 
 # --- 12. Execução da Aplicação ---
 if __name__ == '__main__':
+    # with app.app_context():
+    #     init_db()
     app.run(debug=True)
