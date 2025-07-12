@@ -604,18 +604,50 @@ def corrigir_redacao(redacao_id):
             return jsonify({
                 'nota_total': redacao['nota_total'],
                 'notas': [redacao['nota_c1'], redacao['nota_c2'], redacao['nota_c3'], 
-                         redacao['nota_c4'], redacao['nota_c5']],
+                redacao['nota_c4'], redacao['nota_c5']],
                 'feedback': redacao['feedback']
             })
 
         texto_redacao = redacao['texto_redacao']
 
         prompt = f"""
-        Aja como um corretor experiente do ENEM. Avalie a seguinte redação com base nas 5 competências do ENEM.
-        Para cada competência, atribua uma nota de 0 a 200, em múltiplos de 40.
-        A nota total deve ser a soma das 5 competências.
-        Forneça um feedback geral construtivo sobre o texto, destacando pontos fortes e áreas para melhoria.
-        O formato da sua resposta DEVE ser um objeto JSON válido, sem nenhum texto antes ou depois, com a seguinte estrutura:
+        Você é um corretor especialista em redações do ENEM com 10 anos de experiência. Está avaliando uma redação de um estudante que está se preparando para o ENEM 2025. 
+
+    Siga RIGOROSAMENTE as diretrizes oficiais do MEC para correção, considerando as 5 competências:
+
+    1. DOMÍNIO DA NORMA CULTA (0-200 pontos)
+    - Avalie gramática, ortografia, pontuação e registro formal
+    - Desconte pontos por erros recorrentes, mas reconheça acertos
+
+    2. COMPREENSÃO DO TEMA (0-200 pontos)
+    - Verifique se o texto aborda completamente o tema proposto
+    - Avalie se há fuga parcial ou total ao tema
+    - Considere a profundidade da abordagem
+
+    3. ARGUMENTAÇÃO E ORGANIZAÇÃO (0-200 pontos)
+    - Analise a estrutura do texto (introdução, desenvolvimento, conclusão)
+    - Avalie a qualidade dos argumentos e a progressão temática
+    - Verifique o uso de repertório sociocultural pertinente
+
+    4. COESÃO E COERÊNCIA (0-200 pontos)
+    - Avalie os mecanismos de coesão (conectivos, referências)
+    - Verifique a coerência entre as partes do texto
+    - Considere a organização lógica das ideias
+
+    5. PROPOSTA DE INTERVENÇÃO (0-200 pontos)
+    - Avalie se a proposta é detalhada e viável
+    - Verifique se contempla agentes, ações, meios e efeitos
+    - Considere a originalidade e pertinência da proposta
+
+    INSTRUÇÕES PARA A CORREÇÃO:
+
+    1. Seja rigoroso, mas pedagógico. Aponte erros, mas também destaque acertos.
+    2. Atribua notas justas, considerando o nível de um estudante em preparação.
+    3. Forneça justificativas detalhadas para cada competência.
+    4. Inclua sugestões específicas de melhoria com exemplos.
+    5. Formate sua resposta como JSON válido, sem texto adicional.
+
+    ESTRUTURA DO JSON DE RESPOSTA:
         {{
         "nota_c1": <nota>,
         "nota_c2": <nota>,
@@ -643,15 +675,15 @@ def corrigir_redacao(redacao_id):
             nota_c1 = %s, nota_c2 = %s, nota_c3 = %s, nota_c4 = %s, nota_c5 = %s, nota_total = %s, feedback = %s
             WHERE id = %s''',
             (correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], 
-             correcao['nota_c4'], correcao['nota_c5'], correcao['nota_total'], 
-             correcao['feedback'], redacao_id)
+            correcao['nota_c4'], correcao['nota_c5'], correcao['nota_total'], 
+            correcao['feedback'], redacao_id)
         )
         conn.commit()
         
         resposta_final = {
             'nota_total': correcao['nota_total'],
             'notas': [correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], 
-                     correcao['nota_c4'], correcao['nota_c5']],
+                    correcao['nota_c4'], correcao['nota_c5']],
             'feedback': correcao['feedback']
         }
         return jsonify(resposta_final)

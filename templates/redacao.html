@@ -11,6 +11,19 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
+<style>
+    .tema-display-box {
+    padding: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    background-color: var(--color-primary-light);
+    border-left: 5px solid var(--color-primary);
+    border-radius: var(--border-radius);
+    font-weight: 500;
+    color: var(--color-dark);
+    line-height: 1.5;
+}
+</style>
 <body>
     <div class="container">
         <div class="main-content">
@@ -53,8 +66,7 @@
                                     <option value="O indivíduo frente à ética nacional">ENEM 2009: O indivíduo frente à ética nacional</option>
                                 </select>
                             </div>
-                            <div class="form-group tema-info">
-                                <h5 id="tema-selecionado" class="text-primary">Tema selecionado: Nenhum</h5>
+                            <div id="tema-selecionado-display" class="tema-display-box">
                             </div>
                             <div class="form-group">
                                 <label for="redacao-textarea" class="form-label">Sua Redação</label>
