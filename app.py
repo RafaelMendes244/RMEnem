@@ -179,7 +179,15 @@ def login_email():
 def register():
     email = request.form['email']
     password = request.form['password']
-    name = request.form.get('name', '')
+    name = request.form.get('name', '').strip()
+
+    if not name or len(name) < 3 or not name.replace(' ', '').isalpha():
+        flash('Por favor, insira um nome válido (pelo menos 3 letras, sem números ou caracteres especiais).', 'danger')
+        return redirect(url_for('login'))
+
+    if len(password) < 6:
+        flash('A senha deve ter pelo menos 6 caracteres.', 'danger')
+        return redirect(url_for('login'))
     
     conn = get_db_connection()
     cur = conn.cursor() # PostgreSQL usa um cursor para executar comandos

@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressText = document.getElementById('progress-text');
     const progressBar = document.getElementById('progress-bar');
     const timerDisplaySpan = document.querySelector('#timer-display span');
-    
+
     // --- Variáveis de estado ---
     let questionsToSolve = [];
     let userAnswers = {};
@@ -40,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const DURATION_SECONDS = questionsToSolve.length * 3 * 60; // 3 minutos por questão
         let remainingTime = DURATION_SECONDS;
         if (timerDisplaySpan) timerDisplaySpan.textContent = formatTime(remainingTime);
-        
+
         if (timerInterval) clearInterval(timerInterval);
         timerInterval = setInterval(() => {
             remainingTime--;
@@ -52,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }, 1000);
     };
-    
+
     const stopTimer = () => clearInterval(timerInterval);
 
     // --- LÓGICA DO SIMULADO ---
@@ -64,15 +64,15 @@ document.addEventListener('DOMContentLoaded', () => {
             if (data.error || !Array.isArray(data)) throw new Error('Resposta inválida da API de provas.');
 
             const years = [...new Set(data.map(prova => prova.year))];
-            
+
             anoSelect.innerHTML = '<option value="">Selecione um ano</option>';
             years.sort((a, b) => b - a)
-               .forEach(year => {
-                const option = document.createElement('option');
-                option.value = year;
-                option.textContent = year;
-                anoSelect.appendChild(option);
-            });
+                .forEach(year => {
+                    const option = document.createElement('option');
+                    option.value = year;
+                    option.textContent = year;
+                    anoSelect.appendChild(option);
+                });
         } catch (error) {
             console.error('Erro ao carregar anos:', error);
             anoSelect.innerHTML = '<option value="">Erro ao carregar</option>';
@@ -100,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Por favor, selecione um ano para começar.');
             return;
         }
-        
+
         gerarBtn.disabled = true;
         gerarBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Gerando...`;
 
@@ -112,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const todasAsQuestoesDoAno = await fetchAllQuestionsForYear(ano);
             if (todasAsQuestoesDoAno.length === 0) throw new Error(`Nenhuma questão encontrada para o ano de ${ano}.`);
-            
+
             const questoesDaDisciplina = todasAsQuestoesDoAno.filter(q => q.discipline === disciplina);
             if (questoesDaDisciplina.length === 0) throw new Error(`Nenhuma questão de "${disciplina.replace(/-/g, ' ')}" foi encontrada na prova de ${ano}.`);
 
@@ -121,10 +121,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert(`A disciplina selecionada tem apenas ${questoesDaDisciplina.length} questões. O simulado será gerado com este número.`);
                 numQuestoesFinal = questoesDaDisciplina.length;
             }
-            
+
             questionsToSolve = shuffleArray(questoesDaDisciplina).slice(0, numQuestoesFinal);
             provaTitle.textContent = `Simulado ENEM ${ano} - ${questionsToSolve.length} questões de ${disciplina.replace(/-/g, ' ')}`;
             renderQuestionsToDom(questionsToSolve);
+            window.addEventListener('beforeunload', beforeUnloadHandler);
         } catch (error) {
             console.error('Erro ao gerar simulado:', error);
             alert(`Erro: ${error.message}`);
@@ -136,91 +137,99 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // --- Lógica de confirmação ao sair da página ---
+    const beforeUnloadHandler = (event) => {
+        event.preventDefault();
+        // A maioria dos navegadores modernos ignora o texto retornado e mostra uma mensagem padrão.
+        event.returnValue = 'Tem certeza que deseja sair? Seu progresso no simulado será perdido.';
+        return event.returnValue;
+    };
 
-const renderQuestionsToDom = (questions) => {
-    questoesList.innerHTML = '';
-    userAnswers = {};
 
-    questions.forEach((q, index) => {
-        const questionCard = document.createElement('div');
-        questionCard.className = 'card question-card';
-        
-        const cardHeader = document.createElement('div');
-        cardHeader.className = 'card-header';
-        cardHeader.innerHTML = `<strong>Questão ${index + 1}</strong>`;
+    const renderQuestionsToDom = (questions) => {
+        questoesList.innerHTML = '';
+        userAnswers = {};
 
-        const cardBody = document.createElement('div');
-        cardBody.className = 'card-body';
+        questions.forEach((q, index) => {
+            const questionCard = document.createElement('div');
+            questionCard.className = 'card question-card';
 
-        // Adiciona o contexto e as imagens principais da questão
-        if (q.context) {
-            const contextHtml = (q.context).replace(/!\[.*?\]\((.*?)\)/g, '<img src="$1" alt="Imagem da questão" class="img-fluid my-2">');
-            cardBody.innerHTML += marked.parse(contextHtml);
-        }
-        if (q.files && q.files.length > 0) {
-            q.files.forEach(fileUrl => {
-                cardBody.innerHTML += `<img src="${fileUrl}" alt="Imagem da questão" class="img-fluid my-2">`;
-            });
-        }
-        if (q.alternativesIntroduction) {
-            cardBody.innerHTML += `<div class="mt-3">${marked.parse(q.alternativesIntroduction)}</div>`;
-        }
-        
-        const alternativesContainer = document.createElement('div');
-        alternativesContainer.className = 'mt-3';
+            const cardHeader = document.createElement('div');
+            cardHeader.className = 'card-header';
+            cardHeader.innerHTML = `<strong>Questão ${index + 1}</strong>`;
 
-        // Lógica corrigida para criar as alternativas
-        q.alternatives?.forEach(alt => {
-            const label = document.createElement('label');
-            label.className = 'alternative';
+            const cardBody = document.createElement('div');
+            cardBody.className = 'card-body';
 
-            const radio = document.createElement('input');
-            radio.type = 'radio';
-            radio.name = `question-${index}`;
-            radio.value = alt.letter;
-            
-            radio.addEventListener('change', () => {
-                userAnswers[q.title] = radio.value;
-                questionCard.querySelectorAll('.alternative').forEach(l => l.classList.remove('selected'));
-                label.classList.add('selected');
-                updateProgress();
-            });
-
-            const strong = document.createElement('strong');
-            strong.textContent = `${alt.letter}) `;
-
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'alternative-content';
-
-            // LÓGICA CORRIGIDA: Trata texto e imagem separadamente
-            if (alt.text) {
-                // Usa textContent para segurança e simplicidade, evitando erros de formatação
-                contentDiv.textContent = alt.text;
+            // Adiciona o contexto e as imagens principais da questão
+            if (q.context) {
+                const contextHtml = (q.context).replace(/!\[.*?\]\((.*?)\)/g, '<img src="$1" alt="Imagem da questão" class="img-fluid my-2">');
+                cardBody.innerHTML += marked.parse(contextHtml);
             }
-            if (alt.file) {
-                const img = document.createElement('img');
-                img.src = alt.file;
-                img.alt = `Alternativa ${alt.letter}`;
-                img.className = 'img-fluid-alternative';
-                contentDiv.appendChild(img);
+            if (q.files && q.files.length > 0) {
+                q.files.forEach(fileUrl => {
+                    cardBody.innerHTML += `<img src="${fileUrl}" alt="Imagem da questão" class="img-fluid my-2">`;
+                });
             }
-            
-            label.appendChild(radio);
-            label.appendChild(strong);
-            label.appendChild(contentDiv);
-            alternativesContainer.appendChild(label);
+            if (q.alternativesIntroduction) {
+                cardBody.innerHTML += `<div class="mt-3">${marked.parse(q.alternativesIntroduction)}</div>`;
+            }
+
+            const alternativesContainer = document.createElement('div');
+            alternativesContainer.className = 'mt-3';
+
+            // Lógica corrigida para criar as alternativas
+            q.alternatives?.forEach(alt => {
+                const label = document.createElement('label');
+                label.className = 'alternative';
+
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = `question-${index}`;
+                radio.value = alt.letter;
+
+                radio.addEventListener('change', () => {
+                    userAnswers[q.title] = radio.value;
+                    questionCard.querySelectorAll('.alternative').forEach(l => l.classList.remove('selected'));
+                    label.classList.add('selected');
+                    updateProgress();
+                });
+
+                const strong = document.createElement('strong');
+                strong.textContent = `${alt.letter}) `;
+
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'alternative-content';
+
+                // LÓGICA CORRIGIDA: Trata texto e imagem separadamente
+                if (alt.text) {
+                    // Usa textContent para segurança e simplicidade, evitando erros de formatação
+                    contentDiv.textContent = alt.text;
+                }
+                if (alt.file) {
+                    const img = document.createElement('img');
+                    img.src = alt.file;
+                    img.alt = `Alternativa ${alt.letter}`;
+                    img.className = 'img-fluid-alternative';
+                    contentDiv.appendChild(img);
+                }
+
+                label.appendChild(radio);
+                label.appendChild(strong);
+                label.appendChild(contentDiv);
+                alternativesContainer.appendChild(label);
+            });
+
+            cardBody.appendChild(alternativesContainer);
+            questionCard.appendChild(cardHeader);
+            questionCard.appendChild(cardBody);
+            questoesList.appendChild(questionCard);
         });
 
-        cardBody.appendChild(alternativesContainer);
-        questionCard.appendChild(cardHeader);
-        questionCard.appendChild(cardBody);
-        questoesList.appendChild(questionCard);
-    });
+        updateProgress();
+        startTimer();
+    };
 
-    updateProgress();
-    startTimer();
-};
-    
     const shuffleArray = (array) => {
         for (let i = array.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -233,16 +242,17 @@ const renderQuestionsToDom = (questions) => {
         const answeredCount = Object.keys(userAnswers).length;
         const totalQuestions = questionsToSolve.length;
         const percentage = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
-        
-        if(progressText) progressText.textContent = `${answeredCount} de ${totalQuestions} questões`;
-        if(progressBar) progressBar.style.width = `${percentage}%`;
-        if(submitBtn) submitBtn.disabled = answeredCount !== totalQuestions;
+
+        if (progressText) progressText.textContent = `${answeredCount} de ${totalQuestions} questões`;
+        if (progressBar) progressBar.style.width = `${percentage}%`;
+        if (submitBtn) submitBtn.disabled = answeredCount !== totalQuestions;
     };
 
     const submitAnswers = async (timeUp = false) => {
         if (!timeUp && !confirm('Tem certeza que deseja enviar suas respostas?')) return;
 
         stopTimer();
+        window.removeEventListener('beforeunload', beforeUnloadHandler);
         submitBtn.disabled = true;
         submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Enviando...`;
 
@@ -278,7 +288,7 @@ const renderQuestionsToDom = (questions) => {
             submitBtn.innerHTML = `<i class="fas fa-paper-plane"></i> Enviar Respostas e Ver Resultado`;
         }
     };
-    
+
     // --- Event Listeners ---
     if (simuladoForm) {
         simuladoForm.addEventListener('submit', gerarSimuladoPersonalizado);
@@ -286,9 +296,9 @@ const renderQuestionsToDom = (questions) => {
     if (submitBtn) {
         submitBtn.addEventListener('click', () => submitAnswers(false));
     }
-    
+
     // --- Inicialização ---
-    if(anoSelect) {
+    if (anoSelect) {
         loadAvailableYears();
     }
 });
