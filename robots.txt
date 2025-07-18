@@ -1,0 +1,4 @@
+User-agent: *
+Disallow:
+
+Sitemap: https://rmsimulador.onrender.com/sitemap.xml
