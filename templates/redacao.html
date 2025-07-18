@@ -23,6 +23,16 @@
     color: var(--color-dark);
     line-height: 1.5;
 }
+
+    .links-rodape {
+    color: #4361ee;
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.links-rodape:hover {
+    color: #3a56d4;
+}
 </style>
 <body>
     <div class="container">
@@ -83,6 +93,15 @@
             </main>
         </div>
     </div>
+
+    <footer class="main-footer">
+        <p>Criado Por <a class="links-rodape" href="https://rmsites.vercel.app/" target="_blank">WebSites RM</a>. © 2025 Todos os direitos reservados.</p>
+        <div class="footer-links">
+            <a class="links-rodape" href="{{ url_for('apoie_page') }}" target="_blank">Apoie o Projeto</a>
+            <span>&middot;</span>
+            <a class="links-rodape" href="{{ url_for('reportar_bug_page') }}" target="_blank">Reportar um Bug</a>
+        </div>
+    </footer>
     <script src="/static/js/redacao.js"></script>
 
 <script>

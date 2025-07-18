@@ -9,7 +9,7 @@ import json
 from datetime import datetime
 from functools import wraps
 from dotenv import load_dotenv
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, g
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, g, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import google.generativeai as genai
 import psycopg2
@@ -818,6 +818,17 @@ def view_db(secret_key):
         return f"Ocorreu um erro ao acessar o banco de dados: {e}"
     finally:
         cur.close()
+
+# Rota para SEO
+# Rota para o robots.txt
+@app.route('/robots.txt')
+def robots():
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'robots.txt')
+
+# Rota para o sitemap.xml
+@app.route('/sitemap.xml')
+def sitemap():
+    return send_from_directory(os.path.join(app.root_path, 'static'), 'sitemap.xml')
 
 # --- 12. Execução da Aplicação ---
 if __name__ == '__main__':

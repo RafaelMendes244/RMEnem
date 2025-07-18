@@ -36,6 +36,14 @@
         color: #0c5460;
         border: 1px solid #bee5eb;
     }
+
+    .btn-register:hover {
+        color: background-color: var(--color-primary-dark);
+    }
+
+    .btn-esqueci-senha:hover {
+        color: background-color: var(--color-secondary-dark);
+    }
 </style>
 <body>
     <div class="login-container">
@@ -67,10 +75,10 @@
                                 <button type="button" class="toggle-password" aria-label="Mostrar senha"><i class="fas fa-eye"></i></button>
                             </div>
                         </div>
-                        <p class="text-right" style="font-size: 0.9rem; margin-top: -10px; margin-bottom: 15px;"><a href="{{ url_for('esqueci_senha_page') }}">Esqueci minha senha?</a></p>
+                        <p class="text-right" style="font-size: 0.9rem; margin-top: -10px; margin-bottom: 15px;"><a class="btn-esqueci-senha" href="{{ url_for('esqueci_senha_page') }}">Esqueci minha senha?</a></p>
                         <button type="submit" class="btn btn-primary btn-block btn-lg">Entrar</button>
                     </form>
-                    <p class="text-center mt-4">Não tem uma conta? <a href="#" id="show-register">Cadastre-se</a></p>
+                    <p class="text-center mt-4">Não tem uma conta? <a class="btn-register" href="#" id="show-register">Cadastre-se</a></p>
                 </div>
 
                 <div id="register-form-container" style="display: none;">
@@ -101,6 +109,15 @@
             </div>
         </div>
     </div>
+
+    <footer class="main-footer">
+        <p>Criado Por <a class="links-rodape" href="https://rmsites.vercel.app/" target="_blank">WebSites RM</a>. © 2025 Todos os direitos reservados.</p>
+        <div class="footer-links">
+            <a class="links-rodape" href="{{ url_for('apoie_page') }}" target="_blank">Apoie o Projeto</a>
+            <span>&middot;</span>
+            <a class="links-rodape" href="{{ url_for('reportar_bug_page') }}" target="_blank">Reportar um Bug</a>
+        </div>
+    </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
