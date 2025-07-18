@@ -830,6 +830,11 @@ def robots():
 def sitemap():
     return send_from_directory(os.path.join(app.root_path, 'static'), 'sitemap.xml')
 
+# Serve o arquivo de verificação diretamente da raiz
+@app.route('/googlecfb1a13facc969a3.html')
+def verify_google():
+    return send_from_directory(os.path.join(app.root_path), 'googlecfb1a13facc969a3.html')
+
 # --- 12. Execução da Aplicação ---
 if __name__ == '__main__':
     # with app.app_context():
