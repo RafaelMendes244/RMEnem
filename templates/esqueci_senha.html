@@ -14,11 +14,11 @@
     color: #4361ee;
     text-decoration: none;
     transition: color 0.3s ease;
-}
+    }
 
-.links-rodape:hover {
-    color: #3a56d4;
-}
+    .links-rodape:hover {
+        color: #3a56d4;
+    }
 </style>
 <body>
     <header class="main-header">
@@ -31,7 +31,7 @@
                     {% if user %}
                         <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm">Sair</a>
                     {% else %}
-                        <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm">Entrar</a>
+                        <li><a href="/login" class="nav-link"><i class="fas fa-sign-in-alt"></i> Entrar</a></li>
                     {% endif %}
                 </div>
             </nav>
@@ -71,7 +71,7 @@
     </main>
 
     <footer class="main-footer">
-        <p>Criado Por <a class="links-rodape" href="https://rmsites.vercel.app/" target="_blank">WebSites RM</a>. © 2025 Todos os direitos reservados.</p>
+        <p>© 2025 <a class="links-rodape" href="https://rmsites.vercel.app/" target="_blank">WebSites RM</a>. Todos os direitos reservados.</p>
         <div class="footer-links">
             <a class="links-rodape" href="{{ url_for('apoie_page') }}" target="_blank">Apoie o Projeto</a>
             <span>&middot;</span>

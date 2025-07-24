@@ -37,12 +37,39 @@
         border: 1px solid #bee5eb;
     }
 
+    .btn-register {
+        color: #4361ee;
+        text-decoration: none;
+        transition: color 0.3s ease;
+    }
+
     .btn-register:hover {
-        color: background-color: var(--color-primary-dark);
+        color: var(--color-secondary-dark);
+    }
+
+    .btn-esqueci-senha {
+        color: #4361ee;
+        text-decoration: none;
+        transition: color 0.3s ease;
     }
 
     .btn-esqueci-senha:hover {
-        color: background-color: var(--color-secondary-dark);
+        color: var(--color-secondary-dark);
+    }
+
+
+    #hide-register:hover {
+        color: var(--color-secondary-dark);
+    }
+
+    .links-rodape {
+    color: #4361ee;
+    text-decoration: none;
+    transition: color 0.3s ease;
+    }
+
+    .links-rodape:hover {
+        color: #3a56d4;
     }
 </style>
 <body>
@@ -111,7 +138,7 @@
     </div>
 
     <footer class="main-footer">
-        <p>Criado Por <a class="links-rodape" href="https://rmsites.vercel.app/" target="_blank">WebSites RM</a>. © 2025 Todos os direitos reservados.</p>
+        <p>© 2025 <a class="links-rodape" href="https://rmsites.vercel.app/" target="_blank">WebSites RM</a>. Todos os direitos reservados.</p>
         <div class="footer-links">
             <a class="links-rodape" href="{{ url_for('apoie_page') }}" target="_blank">Apoie o Projeto</a>
             <span>&middot;</span>

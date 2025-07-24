@@ -95,35 +95,14 @@
     </div>
 
     <footer class="main-footer">
-        <p>Criado Por <a class="links-rodape" href="https://rmsites.vercel.app/" target="_blank">WebSites RM</a>. © 2025 Todos os direitos reservados.</p>
+        <p>© 2025 <a class="links-rodape" href="https://rmsites.vercel.app/" target="_blank">WebSites RM</a>. Todos os direitos reservados.</p>
         <div class="footer-links">
             <a class="links-rodape" href="{{ url_for('apoie_page') }}" target="_blank">Apoie o Projeto</a>
             <span>&middot;</span>
             <a class="links-rodape" href="{{ url_for('reportar_bug_page') }}" target="_blank">Reportar um Bug</a>
         </div>
     </footer>
+    
     <script src="/static/js/redacao.js"></script>
-
-<script>
-    const temaSelect = document.getElementById("tema-select");
-    const temaSelecionado = document.getElementById("tema-selecionado");
-    const randomBtn = document.getElementById("random-theme-btn");
-
-    // Atualiza o título quando o usuário escolhe manualmente
-    temaSelect.addEventListener("change", () => {
-        temaSelecionado.textContent = "Tema selecionado: " + temaSelect.value;
-    });
-
-    // Escolhe um tema aleatório quando o botão é clicado
-    randomBtn.addEventListener("click", () => {
-        const options = temaSelect.options;
-        const randomIndex = Math.floor(Math.random() * options.length);
-        temaSelect.selectedIndex = randomIndex;
-        temaSelecionado.textContent = "Tema selecionado: " + options[randomIndex].value;
-    });
-
-    // Inicializar com o primeiro tema, se desejado
-    temaSelecionado.textContent = "Tema selecionado: " + temaSelect.value;
-</script>
 </body>
 </html>
