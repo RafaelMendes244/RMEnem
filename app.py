@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash, g, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import google.generativeai as genai
+import openai
+import anthropic
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask_mail import Mail, Message
@@ -609,6 +611,7 @@ def corrigir_redacao(redacao_id):
             return jsonify({'error': 'Redação não encontrada.'}), 404
 
         if redacao['feedback']:
+            # Se já tem feedback, retorna o feedback existente
             return jsonify({
                 'nota_total': redacao['nota_total'],
                 'notas': [redacao['nota_c1'], redacao['nota_c2'], redacao['nota_c3'], 
@@ -618,106 +621,196 @@ def corrigir_redacao(redacao_id):
 
         texto_redacao = redacao['texto_redacao']
 
-        prompt = f"""
+        # --- 1. PROMPT BASE PARA TODAS AS APIS (adapte se for muito diferente) ---
+        # Este prompt deve ser o mais universal possível para funcionar bem com todas as LLMs
+        base_prompt = f"""
         Você é um corretor especialista em redações do ENEM com 10 anos de experiência. Está avaliando uma redação de um estudante que está se preparando para o ENEM 2025. 
 
-    Siga RIGOROSAMENTE as diretrizes oficiais do MEC para correção, considerando as 5 competências:
+        Siga RIGOROSAMENTE as diretrizes oficiais do MEC para correção, considerando as 5 competências:
 
-    1. DOMÍNIO DA NORMA CULTA (0-200 pontos)
-    - Avalie gramática, ortografia, pontuação e registro formal
-    - Desconte pontos por erros recorrentes, mas reconheça acertos
+        1. DOMÍNIO DA NORMA CULTA (0-200 pontos)
+        - Avalie gramática, ortografia, pontuação e registro formal
+        - Desconte pontos por erros recorrentes, mas reconheça acertos
 
-    2. COMPREENSÃO DO TEMA (0-200 pontos)
-    - Verifique se o texto aborda completamente o tema proposto
-    - Avalie se há fuga parcial ou total ao tema
-    - Considere a profundidade da abordagem
+        2. COMPREENSÃO DO TEMA (0-200 pontos)
+        - Verifique se o texto aborda completamente o tema proposto
+        - Avalie se há fuga parcial ou total ao tema
+        - Considere a profundidade da abordagem
 
-    3. ARGUMENTAÇÃO E ORGANIZAÇÃO (0-200 pontos)
-    - Analise a estrutura do texto (introdução, desenvolvimento, conclusão)
-    - Avalie a qualidade dos argumentos e a progressão temática
-    - Verifique o uso de repertório sociocultural pertinente
+        3. ARGUMENTAÇÃO E ORGANIZAÇÃO (0-200 pontos)
+        - Analise a estrutura do texto (introdução, desenvolvimento, conclusão)
+        - Avalie a qualidade dos argumentos e a progressão temática
+        - Verifique o uso de repertório sociocultural pertinente
 
-    4. COESÃO E COERÊNCIA (0-200 pontos)
-    - Avalie os mecanismos de coesão (conectivos, referências)
-    - Verifique a coerência entre as partes do texto
-    - Considere a organização lógica das ideias
+        4. COESÃO E COERÊNCIA (0-200 pontos)
+        - Avalie os mecanismos de coesão (conectivos, referências)
+        - Verifique a coerência entre as partes do texto
+        - Considere a organização lógica das ideias
 
-    5. PROPOSTA DE INTERVENÇÃO (0-200 pontos)
-    - Avalie se a proposta é detalhada e viável
-    - Verifique se contempla agentes, ações, meios e efeitos
-    - Considere a originalidade e pertinência da proposta
+        5. PROPOSTA DE INTERVENÇÃO (0-200 pontos)
+        - Avalie se a proposta é detalhada e viável
+        - Verifique se contempla agentes, ações, meios e efeitos
+        - Considere a originalidade e pertinência da proposta
 
-    INSTRUÇÕES PARA A CORREÇÃO:
+        INSTRUÇÕES PARA A CORREÇÃO:
 
-    1. Seja rigoroso, mas pedagógico. Aponte erros, mas também destaque acertos.
-    2. Atribua notas justas, considerando o nível de um estudante em preparação.
-    3. Forneça justificativas detalhadas para cada competência.
-    4. Inclua sugestões específicas de melhoria com exemplos.
-    5. Formate sua resposta como JSON válido, sem texto adicional.
+        1. Seja rigoroso, mas pedagógico. Aponte erros, mas também destaque acertos.
+        2. Atribua notas justas, considerando o nível de um estudante em preparação.
+        3. Forneça justificativas detalhadas para cada competência.
+        4. Inclua sugestões específicas de melhoria com exemplos.
+        5. Formate sua resposta como JSON válido, sem texto adicional.
 
-    ESTRUTURA DO JSON DE RESPOSTA:
-        {{
-        "nota_c1": <nota>,
-        "nota_c2": <nota>,
-        "nota_c3": <nota>,
-        "nota_c4": <nota>,
-        "nota_c5": <nota>,
-        "nota_total": <nota_total>,
-        "feedback": "<seu feedback em texto aqui>"
-        }}
+        ESTRUTURA DO JSON DE RESPOSTA:
+            {{
+            "nota_c1": <nota>,
+            "nota_c2": <nota>,
+            "nota_c3": <nota>,
+            "nota_c4": <nota>,
+            "nota_c5": <nota>,
+            "nota_total": <nota_total>,
+            "feedback": "<seu feedback em texto aqui>"
+            }}
 
-        REDAÇÃO PARA AVALIAR:
-        ---
-        {texto_redacao}
-        ---
+            REDAÇÃO PARA AVALIAR:
+            ---
+            {texto_redacao}
+            ---
         """
 
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        response = model.generate_content(prompt)
-        
-        clean_response = response.text.replace('```json', '').replace('```', '').strip()
-        correcao = json.loads(clean_response)
+        correcao_data = None
+        api_usada = "Nenhuma"
 
-        cur.execute(
-            '''UPDATE redacoes SET 
-            nota_c1 = %s, nota_c2 = %s, nota_c3 = %s, nota_c4 = %s, nota_c5 = %s, nota_total = %s, feedback = %s
-            WHERE id = %s''',
-            (correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], 
-            correcao['nota_c4'], correcao['nota_c5'], correcao['nota_total'], 
-            correcao['feedback'], redacao_id)
-        )
-        conn.commit()
-        
-        resposta_final = {
-            'nota_total': correcao['nota_total'],
-            'notas': [correcao['nota_c1'], correcao['nota_c2'], correcao['nota_c3'], 
-                    correcao['nota_c4'], correcao['nota_c5']],
-            'feedback': correcao['feedback']
-        }
-        return jsonify(resposta_final)
+        # --- 2. TENTAR API GEMINI (PRIMEIRA OPÇÃO) ---
+        try:
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            response_gemini = model.generate_content(base_prompt) # Use o prompt específico da Gemini
+            
+            clean_response_gemini = response_gemini.text.replace('```json', '').replace('```', '').strip()
+            correcao_data = json.loads(clean_response_gemini)
+            api_usada = "Gemini"
 
-    except Exception as e:
-        app.logger.error(f"Erro na API do Gemini ou ao processar a resposta: {e}")
-        return jsonify({'error': 'Não foi possível obter a correção da IA no momento.'}), 500
+        except Exception as e_gemini:
+            app.logger.warning(f"Gemini API falhou ({e_gemini}). Tentando OpenAI como fallback.")
+            
+            # --- 3. TENTAR API OPENAI (SEGUNDA OPÇÃO - FALLBACK) ---
+            try:
+                openai.api_key = os.getenv("OPENAI_API_KEY") 
+
+                response_openai = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo", 
+                    messages=[
+                        {"role": "system", "content": "Você é um corretor de redações ENEM e retorna APENAS JSON."},
+                        {"role": "user", "content": base_prompt}
+                    ],
+                    temperature=0.7,
+                    max_tokens=1000 
+                )
+                
+                openai_raw_text = response_openai.choices[0].message.content.strip()
+                clean_response_openai = openai_raw_text.replace('```json', '').replace('```', '').strip()
+                correcao_data = json.loads(clean_response_openai)
+                api_usada = "OpenAI"
+
+            except Exception as e_openai:
+                app.logger.warning(f"OpenAI API falhou ({e_openai}). Tentando Anthropic (Claude) como fallback.")
+                
+                # --- 4. TENTAR API ANTHROPIC (TERCEIRA OPÇÃO - FALLBACK) ---
+                try:
+                    anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+                    
+                    # Para Anthropic, o formato da mensagem é um pouco diferente (usar messages API)
+                    # e o modelo pode ser 'claude-3-haiku-20240307' ou 'claude-3-sonnet-20240229'
+                    response_anthropic = anthropic_client.messages.create(
+                        model="claude-3-haiku-20240307", # Escolha o modelo Claude
+                        max_tokens=1000,
+                        messages=[
+                            {"role": "user", "content": base_prompt}
+                        ]
+                    )
+                    
+                    anthropic_raw_text = response_anthropic.content[0].text.strip()
+                    clean_response_anthropic = anthropic_raw_text.replace('```json', '').replace('```', '').strip()
+                    correcao_data = json.loads(clean_response_anthropic)
+                    api_usada = "Anthropic"
+
+                except Exception as e_anthropic:
+                    # Se todas as APIs falharem
+                    app.logger.error(f"Todas as APIs de IA falharam (Gemini, OpenAI, Anthropic): {e_anthropic}")
+                    return jsonify({'error': 'Não foi possível obter a correção da IA no momento. Tente novamente mais tarde.'}), 500
+        
+        # --- 5. SE UMA API RETORNOU CORREÇÃO VÁLIDA, SALVAR E RETORNAR ---
+        if correcao_data:
+            cur.execute(
+                '''UPDATE redacoes SET 
+                nota_c1 = %s, nota_c2 = %s, nota_c3 = %s, nota_c4 = %s, nota_c5 = %s, nota_total = %s, feedback = %s
+                WHERE id = %s''',
+                (correcao_data['nota_c1'], correcao_data['nota_c2'], correcao_data['nota_c3'], 
+                correcao_data['nota_c4'], correcao_data['nota_c5'], correcao_data['nota_total'], 
+                correcao_data['feedback'], redacao_id)
+            )
+            conn.commit()
+            
+            resposta_final = {
+                'nota_total': correcao_data['nota_total'],
+                'notas': [correcao_data['nota_c1'], correcao_data['nota_c2'], correcao_data['nota_c3'], 
+                        correcao_data['nota_c4'], correcao_data['nota_c5']],
+                'feedback': correcao_data['feedback']
+            }
+            app.logger.info(f"Redação {redacao_id} corrigida com sucesso usando a API {api_usada}.")
+            return jsonify(resposta_final)
+        else:
+            # Se correcao_data for None (o que não deve acontecer se as exceptions forem tratadas e retornadas corretamente)
+            app.logger.error("API de IA retornou resposta inesperada ou nula.")
+            return jsonify({'error': 'Não foi possível obter a correção da IA no momento (resposta inválida).'}), 500
+
+    except Exception as e_geral:
+        # Erro geral antes das chamadas de API ou de conexão com DB
+        app.logger.error(f"Erro geral em corrigir_redacao: {e_geral}")
+        return jsonify({'error': 'Ocorreu um erro inesperado ao tentar corrigir a redação.'}), 500
     finally:
         cur.close()
 
 @app.route('/api/gerar_tema_aleatorio', methods=['GET'])
 def gerar_tema_aleatorio():
-    prompt = """
-    Aja como um especialista em vestibulares e crie um único tema de redação inédito e plausível para o ENEM 2025.
-    O tema deve seguir o formato oficial, abordando um problema social, cultural ou científico relevante para o Brasil.
-    Exemplos de formato: "Desafios para...", "O papel de...", "A questão de... na sociedade brasileira".
-    Sua resposta deve ser APENAS o texto do tema, sem aspas, sem introduções como "Aqui está o tema:", apenas a frase do tema.
-    """
+    conn = get_db_connection()
+    cur = conn.cursor()
+    tema_gerado = None
+
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
-        response = model.generate_content(prompt)
-        tema_gerado = response.text.strip()
-        return jsonify({'tema': tema_gerado})
+        # Tenta buscar um tema aleatório do banco de dados
+        cur.execute('SELECT tema_texto FROM temas_redacao ORDER BY RANDOM() LIMIT 1')
+        result = cur.fetchone()
+
+        if result:
+            tema_gerado = result['tema_texto']
+            return jsonify({'tema': tema_gerado})
+        else:
+            # Se não houver temas no banco de dados, gera um com a IA como fallback (ou retorna um tema padrão)
+            app.logger.warning("Nenhum tema encontrado no banco de dados. Gerando com a API Gemini como fallback.")
+
+            # CÓDIGO DA API GEMINI PARA GERAR TEMA (SE QUISER UM FALLBACK)
+            prompt = """
+            Aja como um especialista em vestibulares e crie um único tema de redação inédito e plausível para o ENEM 2025.
+            O tema deve seguir o formato oficial, abordando um problema social, cultural ou científico relevante para o Brasil.
+            Exemplos de formato: "Desafios para...", "O papel de...", "A questão de... na sociedade brasileira".
+            Sua resposta deve ser APENAS o texto do tema, sem aspas, sem introduções como "Aqui está o tema:", apenas a frase do tema.
+            """
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            response = model.generate_content(prompt)
+            tema_gerado = response.text.strip()
+
+            # Opcional: Salvar o tema gerado pela IA no banco de dados para uso futuro
+            cur.execute('INSERT INTO temas_redacao (tema_texto) VALUES (%s) ON CONFLICT (tema_texto) DO NOTHING', (tema_gerado,))
+            conn.commit() # Salva o novo tema
+
+            return jsonify({'tema': tema_gerado})
+
     except Exception as e:
-        app.logger.error(f"Erro na API do Gemini ao gerar tema: {e}")
+        app.logger.error(f"Erro ao gerar tema aleatório: {e}")
+        # Retorna um tema padrão em caso de erro no DB ou na API Gemini
         return jsonify({'tema': 'O desafio dos resíduos plásticos nos oceanos e o seu impacto no futuro do planeta'}), 500
+    finally:
+        cur.close()
 
 # --- 10. Rotas de Ranking ---
 @app.route('/ranking')
