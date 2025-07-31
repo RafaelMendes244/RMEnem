@@ -45,6 +45,19 @@ mail = Mail(app)
 mail = Mail(app)
 s = URLSafeTimedSerializer(app.config['SECRET_KEY'])
 
+# NOVO: Redirecionamento de Domínio Antigo para o Domínio Principal
+@app.before_request
+def redirect_old_domain():
+    # Redireciona o domínio .onrender.com para o domínio profissional (https://www.rmsimulador.com.br)
+    if request.host == 'rmsimulador.onrender.com':
+        # Usa request.full_path para manter qualquer rota (ex: /login) no redirecionamento
+        return redirect("https://www.rmsimulador.com.br" + request.full_path, code=301)
+
+    # Opcional, mas recomendado para SEO: Redirecionar 'rmsimulador.com.br' para 'www.rmsimulador.com.br'
+    # Isso garante que seu domínio canônico (principal) seja sempre com 'www'
+    if request.host == 'rmsimulador.com.br':
+        return redirect("https://www.rmsimulador.com.br" + request.full_path, code=301)
+
 # --- 2. Gerenciamento de Banco de Dados (PostgreSQL) ---
 def get_db_connection():
     if 'db' not in g:

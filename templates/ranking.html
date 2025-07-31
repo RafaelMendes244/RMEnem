@@ -54,6 +54,7 @@
                             <p class="mt-3">Carregando ranking...</p>
                         </div>
 
+                        <!-- Tabela para desktop -->
                         <div class="table-responsive">
                             <table id="rankingTable" class="table table-hover" style="display: none;">
                                 <thead>
@@ -68,6 +69,10 @@
                                 <tbody></tbody>
                             </table>
                         </div>
+
+                        <!-- Cards para mobile -->
+                        <div id="rankingCardsContainer" class="ranking-cards-container" style="display: none;"></div>
+
                         <div id="noDataMessage" class="text-center text-muted py-5" style="display: none;">
                             <i class="fas fa-info-circle fa-3x mb-3"></i>
                             <p>Nenhum simulado foi concluído ainda. <br>Seja o primeiro do ranking!</p>
@@ -75,6 +80,14 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
+
+    <!-- Modal para detalhes no mobile -->
+    <div id="rankingModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="modalContent"></div>
         </div>
     </div>
 
@@ -92,16 +105,45 @@
             const loadingSpinner = document.getElementById('loadingSpinner');
             const rankingTable = document.getElementById('rankingTable');
             const rankingTableBody = rankingTable.querySelector('tbody');
+            const rankingCardsContainer = document.getElementById('rankingCardsContainer');
             const noDataMessage = document.getElementById('noDataMessage');
+            const rankingModal = document.getElementById('rankingModal');
+            const modalContent = document.getElementById('modalContent');
+            const closeModal = document.querySelector('.close-modal');
+
+            // Fechar modal
+            closeModal.addEventListener('click', () => {
+                rankingModal.style.display = 'none';
+            });
+
+            // Fechar modal ao clicar fora
+            window.addEventListener('click', (e) => {
+                if (e.target === rankingModal) {
+                    rankingModal.style.display = 'none';
+                }
+            });
 
             fetch('/api/ranking_geral')
                 .then(response => response.ok ? response.json() : Promise.reject('Erro na rede'))
                 .then(data => {
                     loadingSpinner.style.display = 'none';
-                    if (Array.isArray(data) && data.length > 0) {
+                    
+                    // Filtrar dados: apenas quem acertou ≥5 questões e limitar a 5 pessoas
+                    const filteredData = data
+                        .filter(item => item.acertos >= 5)
+                        .slice(0, 5);
+
+                    if (filteredData.length > 0) {
+                        // Mostrar tabela para desktop
                         rankingTable.style.display = 'table';
+                        
+                        // Mostrar cards para mobile
+                        rankingCardsContainer.style.display = 'block';
+                        
                         const headers = ["#", "Usuário", "Acertos (%)", "Acertos (Qtd)", "Tempo Médio"];
-                        data.forEach((item, index) => {
+                        
+                        // Preencher tabela
+                        filteredData.forEach((item, index) => {
                             const row = rankingTableBody.insertRow();
                             row.innerHTML = `
                                 <td data-label="${headers[0]}">${index + 1}</td>
@@ -110,6 +152,40 @@
                                 <td data-label="${headers[3]}">${item.acertos} / ${item.total_questoes}</td>
                                 <td data-label="${headers[4]}">${item.duracao_formatada}</td>
                             `;
+                        });
+                        
+                        // Preencher cards para mobile
+                        filteredData.forEach((item, index) => {
+                            const card = document.createElement('div');
+                            card.className = 'ranking-user';
+                            card.innerHTML = `
+                                <h3><span class="position">${index + 1}º</span> ${item.name}</h3>
+                                <i class="fas fa-chevron-down"></i>
+                            `;
+                            
+                            card.addEventListener('click', () => {
+                                // Mostrar modal com detalhes
+                                modalContent.innerHTML = `
+                                    <h3>${index + 1}º - ${item.name}</h3>
+                                    <div class="ranking-details">
+                                        <div class="ranking-detail-row">
+                                            <span class="ranking-detail-label">Acertos (%):</span>
+                                            <span>${item.porcentagem}%</span>
+                                        </div>
+                                        <div class="ranking-detail-row">
+                                            <span class="ranking-detail-label">Acertos (Qtd):</span>
+                                            <span>${item.acertos} / ${item.total_questoes}</span>
+                                        </div>
+                                        <div class="ranking-detail-row">
+                                            <span class="ranking-detail-label">Tempo Médio:</span>
+                                            <span>${item.duracao_formatada}</span>
+                                        </div>
+                                    </div>
+                                `;
+                                rankingModal.style.display = 'block';
+                            });
+                            
+                            rankingCardsContainer.appendChild(card);
                         });
                     } else {
                         noDataMessage.style.display = 'block';
