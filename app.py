@@ -17,10 +17,20 @@ import anthropic
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask_mail import Mail, Message
+import smtplib
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail as SendGridMail
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
+import ssl
+import certifi
 
 # --- 1. Inicialização e Configuração ---
 load_dotenv()
+
+# Configuração SSL para usar certificados do certifi
+os.environ['SSL_CERT_FILE'] = certifi.where()
+os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY')
 
@@ -138,6 +148,46 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+# Funçoes para ENVIAR para um DOS DOIS EMAILS
+def send_email(recipient, subject, html_body):
+    # Tenta enviar com Flask-Mail (Gmail) primeiro
+    try:
+        msg = Message(subject,
+                    sender=('RM ENEM Simulador', app.config['MAIL_USERNAME']),
+                    recipients=[recipient],
+                    html=html_body)
+        mail.send(msg)
+        print(f"E-mail para {recipient} enviado com sucesso via Gmail.")
+        return True
+    except Exception as e:
+        app.logger.error(f"FALHA NO ENVIO COM GMAIL: {e}. Tentando SendGrid...")
+        # Se o Gmail falhar, tenta com SendGrid
+        try:
+            from_email = ('rafinha.break07@gmail.com', 'RM ENEM Simulador') # Use seu e-mail verificado no SendGrid aqui
+            message = SendGridMail(
+                from_email=from_email,
+                to_emails=recipient,
+                subject=subject,
+                html_content=html_body
+            )
+            
+            # Configuração SSL explícita para SendGrid
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+            
+            sg = SendGridAPIClient(os.getenv('SENDGRID_API_KEY'))
+            response = sg.send(message)
+            
+            if response.status_code >= 200 and response.status_code < 300:
+                print(f"E-mail para {recipient} enviado com sucesso via SendGrid.")
+                return True
+            else:
+                app.logger.error(f"FALHA NO SENDGRID (STATUS CODE): {response.status_code} - {response.body}")
+                return False
+        except Exception as sg_e:
+            app.logger.error(f"FALHA NO ENVIO COM SENDGRID: {sg_e}")
+            return False
+
 # --- 5. Funções Auxiliares ---
 def get_questions_from_api_with_cache(year):
     if year in questions_cache: return questions_cache[year]
@@ -192,10 +242,12 @@ def login_email():
 
 @app.route('/register', methods=['POST'])
 def register():
+    # 1. Pega os dados do formulário
     email = request.form['email']
     password = request.form['password']
     name = request.form.get('name', '').strip()
 
+    # 2. Faz as validações dos campos
     if not name or len(name) < 3 or not name.replace(' ', '').isalpha():
         flash('Por favor, insira um nome válido (pelo menos 3 letras, sem números ou caracteres especiais).', 'danger')
         return redirect(url_for('login'))
@@ -204,35 +256,35 @@ def register():
         flash('A senha deve ter pelo menos 6 caracteres.', 'danger')
         return redirect(url_for('login'))
     
-    conn = get_db_connection()
-    cur = conn.cursor() # PostgreSQL usa um cursor para executar comandos
+    # 3. Interage com o banco de dados
+    conn = get_db_connection() # Pega a conexão gerenciada pelo Flask
+    cur = conn.cursor()
     
-    # CORREÇÃO: Usa %s em vez de ?
+    # Verifica se o e-mail já existe
     cur.execute('SELECT * FROM users WHERE email = %s', (email,))
-    
     if cur.fetchone():
         flash('Este email já está cadastrado. Por favor, tente fazer o login.', 'danger')
         cur.close()
         return redirect(url_for('login'))
-        
+    
+    # Se não existe, cria o novo usuário
     hashed_password = generate_password_hash(password)
-    # CORREÇÃO: Usa %s em vez de ?
     cur.execute('INSERT INTO users (email, password, name) VALUES (%s, %s, %s)',
                 (email, hashed_password, name))
-    conn.commit() # Salva as alterações
+    conn.commit() # Salva a alteração no banco
     cur.close()
 
-    # A lógica de envio de e-mail continua a mesma
-    token = s.dumps(email, salt='email-confirm')
-    confirm_url = url_for('confirmar_email', token=token, _external=True)
-    html = render_template('email_confirmacao.html', confirm_url=confirm_url)
-    msg = Message('Confirme seu E-mail - RM ENEM Simulador',
-                sender=('RM ENEM Simulador', app.config['MAIL_USERNAME']), 
-                recipients=[email],
-                html=html)
-    mail.send(msg)
+    # 4. Envia o e-mail de confirmação
+    try:
+        token = s.dumps(email, salt='email-confirm')
+        confirm_url = url_for('confirmar_email', token=token, _external=True)
+        html = render_template('email_confirmacao.html', confirm_url=confirm_url)
+        send_email(email, 'Confirme seu E-mail - RM ENEM Simulador', html)
+        flash('Cadastro realizado! Um e-mail de confirmação foi enviado para sua caixa de entrada.', 'success')
+    except Exception as e:
+        app.logger.error(f"Falha ao enviar e-mail de confirmação: {e}")
+        flash('Cadastro realizado, mas houve uma falha ao enviar o e-mail de confirmação.', 'warning')
 
-    flash('Cadastro realizado! Um e-mail de confirmação foi enviado para sua caixa de entrada.', 'success')
     return redirect(url_for('login'))
 
 @app.route('/confirmar/<token>')
@@ -258,42 +310,29 @@ def confirmar_email(token):
 
 @app.route('/esqueci-senha', methods=['GET', 'POST'])
 def esqueci_senha_page():
-    # Se o usuário já estiver logado, não faz sentido ele estar aqui
     if 'user' in session:
         return redirect(url_for('index'))
     
-    # Se o formulário for enviado (método POST)
     if request.method == 'POST':
         email = request.form.get('email')
         conn = get_db_connection()
-        cur = conn.cursor() # Cria um cursor para o PostgreSQL
-        
-        # Usa %s como placeholder
+        cur = conn.cursor()
         cur.execute('SELECT * FROM users WHERE email = %s', (email,))
         user = cur.fetchone()
-        cur.close() # Fecha o cursor após a consulta
+        cur.close()
 
         # Por segurança, mostramos a mesma mensagem mesmo que o e-mail não exista
-        # para não informar a hackers quais e-mails estão ou não cadastrados.
         if user:
-            # Gera um token seguro e com tempo de validade (1 hora)
+            # A lógica para gerar o token e o corpo do e-mail continua a mesma
             token = s.dumps(email, salt='password-reset-salt')
             reset_url = url_for('redefinir_senha_page', token=token, _external=True)
-
-            # Renderiza o template do corpo do e-mail
             html = render_template('email_redefinir_senha.html', reset_url=reset_url)
             
-            # Cria a mensagem do e-mail
-            msg = Message('Redefinição de Senha - RM ENEM Simulador',
-                        sender=('RM ENEM Simulador', app.config['MAIL_USERNAME']),
-                        recipients=[email],
-                        html=html)
-            mail.send(msg)
-            
+            send_email(email, 'Redefinição de Senha - RM ENEM Simulador', html)
+        
         flash('Se o seu e-mail estiver em nosso sistema, um link para redefinição de senha foi enviado.', 'success')
         return redirect(url_for('login'))
 
-    # Se a requisição for GET, apenas mostra a página
     return render_template('esqueci_senha.html')
 
 @app.route('/redefinir-senha/<token>', methods=['GET', 'POST'])
