@@ -36,17 +36,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const startTimer = () => {
-        startTime = Date.now();
         const DURATION_SECONDS = questionsToSolve.length * 3 * 60; // 3 minutos por questão
-        let remainingTime = DURATION_SECONDS;
-        if (timerDisplaySpan) timerDisplaySpan.textContent = formatTime(remainingTime);
+        startTime = Date.now(); // Marca o tempo de início do simulado
 
         if (timerInterval) clearInterval(timerInterval);
+
         timerInterval = setInterval(() => {
-            remainingTime--;
+            const elapsedTime = Math.floor((Date.now() - startTime) / 1000); // Tempo decorrido em segundos
+            const remainingTime = DURATION_SECONDS - elapsedTime; // Recalcula o tempo restante
+
             if (timerDisplaySpan) timerDisplaySpan.textContent = formatTime(remainingTime);
+
             if (remainingTime <= 0) {
                 clearInterval(timerInterval);
+                if (timerDisplaySpan) timerDisplaySpan.textContent = "00:00:00"; // Garante que exiba 00:00:00
                 alert('O tempo para o simulado acabou!');
                 submitAnswers(true);
             }
