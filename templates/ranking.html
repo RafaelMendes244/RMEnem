@@ -127,6 +127,8 @@
                 .then(response => response.ok ? response.json() : Promise.reject('Erro na rede'))
                 .then(data => {
                     loadingSpinner.style.display = 'none';
+
+                    const sortedData = data.sort((a, b) => b.acertos - a.acertos);
                     
                     // Filtrar dados: apenas quem acertou ≥5 questões e limitar a 5 pessoas
                     const filteredData = data

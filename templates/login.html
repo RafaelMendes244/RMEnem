@@ -113,19 +113,25 @@
                     <form action="/register" method="POST">
                         <div class="form-group">
                             <label for="reg-name" class="form-label">Nome</label>
-                            <input type="text" id="reg-name" name="name" class="form-control" required>
+                            <input type="text" id="reg-name" name="name" class="form-control" placeholder="Nome Sobrenome" required>
                         </div>
                         <div class="form-group">
                             <label for="reg-email" class="form-label">Email</label>
-                            <input type="email" id="reg-email" name="email" class="form-control" required>
+                            <input type="email" id="reg-email" name="email" class="form-control" placeholder="Digite um Email Valido" required>
                         </div>
                         <div class="form-group">
                             <label for="reg-password" class="form-label">Senha</label>
                             <div class="password-input">
-                                <input type="password" id="reg-password" name="password" class="form-control" required>
+                                <input type="password" id="reg-password" name="password" class="form-control" placeholder="Crie uma Senha" required>
                                 <button type="button" class="toggle-password" aria-label="Mostrar senha"><i class="fas fa-eye"></i></button>
                             </div>
                         </div>
+
+                        <div class="info-fixa" style="background-color: #e9f5ff; color: #0c5460; border: 1px solid #b8daff; padding: 12px; border-radius: 4px; font-size: 14px; margin-bottom: 16px;">
+                            Após o cadastro, enviaremos um e-mail de confirmação. Verifique sua <strong>caixa de entrada</strong> e também a <strong>pasta de spam</strong>.
+                        </div>
+
+
                         <button type="submit" class="btn btn-success btn-block btn-lg">Cadastrar</button>
                         <p class="text-center mt-4">Já tem uma conta? <a href="#" id="hide-register">Faça o login</a></p>
                     </form>

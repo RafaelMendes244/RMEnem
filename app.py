@@ -280,7 +280,7 @@ def register():
         confirm_url = url_for('confirmar_email', token=token, _external=True)
         html = render_template('email_confirmacao.html', confirm_url=confirm_url)
         send_email(email, 'Confirme seu E-mail - RM ENEM Simulador', html)
-        flash('Cadastro realizado! Um e-mail de confirmação foi enviado para sua caixa de entrada.', 'success')
+        flash('Cadastro realizado! Um e-mail de confirmação foi enviado. Verifique sua caixa de entrada ou a pasta de spam.', 'success')
     except Exception as e:
         app.logger.error(f"Falha ao enviar e-mail de confirmação: {e}")
         flash('Cadastro realizado, mas houve uma falha ao enviar o e-mail de confirmação.', 'warning')
@@ -330,7 +330,7 @@ def esqueci_senha_page():
             
             send_email(email, 'Redefinição de Senha - RM ENEM Simulador', html)
         
-        flash('Se o seu e-mail estiver em nosso sistema, um link para redefinição de senha foi enviado.', 'success')
+        flash('Se o seu e-mail estiver em nosso sistema, um link para redefinir sua senha foi enviado. Verifique sua caixa de entrada ou a pasta de spam.', 'success')
         return redirect(url_for('login'))
 
     return render_template('esqueci_senha.html')
